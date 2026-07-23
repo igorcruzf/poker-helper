@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { fmt, computeSaldo } from '../utils.js'
 
 export default function AdjustModal({ player, buyIn, onCancel, onConfirm }) {
   const [value, setValue] = useState('')
+  const valueInputRef = useRef(null)
 
   useEffect(() => {
-    if (player) setValue(buyIn.toFixed(2))
-  }, [player, buyIn])
+    if (player) {
+      setValue('')
+      valueInputRef.current?.focus()
+    }
+  }, [player])
 
   if (!player) return null
 
@@ -27,9 +31,11 @@ export default function AdjustModal({ player, buyIn, onCancel, onConfirm }) {
         <div className="modal-field">
           <label>Valor a acrescentar</label>
           <input
+            ref={valueInputRef}
             type="number"
             step="0.01"
             inputMode="decimal"
+            placeholder="0.00"
             value={value}
             onChange={(e) => setValue(e.target.value)}
           />

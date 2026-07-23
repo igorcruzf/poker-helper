@@ -29,6 +29,7 @@ export default function App() {
   const [adjustingPlayer, setAdjustingPlayer] = useState(null)
   const [exportOpen, setExportOpen] = useState(false)
   const [resetOpen, setResetOpen] = useState(false)
+  const [newPlayerId, setNewPlayerId] = useState(null)
 
   const buyIn = state.buyIn
   const players = state.players
@@ -39,12 +40,14 @@ export default function App() {
   }
 
   function addPlayer() {
-    const name = 'Jogador ' + (players.length + 1)
-    setState((s) => ({
-      ...s,
-      players: [...s.players, { id: uid(), name, cacifes: 1, adjustment: 0 }],
-    }))
-  }
+      const id = uid()
+      const name = 'Jogador ' + (players.length + 1)
+      setState((s) => ({
+        ...s,
+        players: [...s.players, { id, name, cacifes: 1, adjustment: 0 }],
+      }))
+      setNewPlayerId(id)
+   }
 
   function renamePlayer(id, name) {
     setState((s) => ({
@@ -127,6 +130,8 @@ export default function App() {
                       onCacifeChange={changeCacife}
                       onDelete={setDeletingPlayer}
                       onOpenAdjust={setAdjustingPlayer}
+                      autoFocus={p.id === newPlayerId}
+                      onFocused={() => setNewPlayerId(null)}
                     />
                   ))}
                 </div>
