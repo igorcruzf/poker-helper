@@ -38,8 +38,13 @@ Four Supabase tables, all owner-scoped by RLS (`players`/`poker_tables` filter o
 - `settlements` — one row per payment (`from_table_player_id` → `to_table_player_id`,
   `amount`, `paid`).
 
-Balance is always **derived**, never stored: `saldo = adjustment - (cacifes × buy_in)`
-(`computeSaldo` in `src/utils.js`). Changing a table's buy-in recomputes everything instantly.
+Balance is always **derived**, never stored. The first buy-in costs `buy_in`; every later one
+costs `rebuy_value` (null = same as `buy_in`, which is how older tables keep computing):
+`saldo = adjustment − cacifesCost(cacifes, buy_in, rebuy)` — `cacifesCost`/`computeSaldo` in
+`src/utils.js`. Both amounts are fixed when the table is created and are **not** editable during
+the night, since changing them would silently rewrite everyone's balance. Anything computing a
+balance must pass `rebuy` through: `settlement.js`, `summary.js`, `useTable`, `useSortedPlayers`,
+and the three screens that render players.
 
 ### State ownership
 
@@ -115,6 +120,22 @@ ending a game copies it automatically, and the table screen's button copies the 
 `useBlindsTimer` is a self-contained, non-persisted countdown: `setInterval`, blind doubling per
 level (`baseBlind * 2^level`), and on zero it pauses and beeps (Web Audio `OscillatorNode`) until
 `confirmNext()`. `TableScreen` mirrors it in the sticky `timer-bar`.
+
+### i18n
+
+`src/lib/i18n.js` holds three dictionaries (`pt`/`en`/`es`) and the locale resolution: the stored
+preference is `auto` (default), which follows `navigator.languages`, or a pinned code. Components
+read strings via `useI18n()`'s `t('area.key', { param })`; a missing key falls back to Portuguese
+and then to the key itself, so gaps are visible instead of blank. **Every new string goes in all
+three dictionaries** — the scratch check in `scripts`-less form: compare `flatten()` of each locale.
+
+Two gotchas: never name a `.map()` callback parameter `t` in a component that translates (it
+shadows the function), and hand-ranking/theme names come from the dictionary (`hands.<id>.name`,
+`themes.<id>`), not from the data files. Currency stays `R$` in pt-BR format regardless of locale —
+the table is played in reais whoever is reading; only `fmtDate` follows the chosen language.
+
+`AppChrome` wraps `Header` plus the theme and language modals, so every screen with a menu (login
+included) gets both without repeating state.
 
 ### Theming
 

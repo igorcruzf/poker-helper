@@ -4,6 +4,7 @@ import { useRoster } from '../hooks/useRoster.js'
 import { useTables } from '../hooks/useTables.js'
 import { parseMoney } from '../utils.js'
 import DeleteRosterPlayerModal from '../components/DeleteRosterPlayerModal.jsx'
+import { useI18n } from '../hooks/useI18n.js'
 
 const DEFAULT_BUYIN = 5
 
@@ -11,9 +12,11 @@ export default function CreateTableScreen() {
   const navigate = useNavigate()
   const { roster, loading: rosterLoading, addToRoster, removeFromRoster } = useRoster()
   const { createTable } = useTables()
+  const { t } = useI18n()
 
   const [name, setName] = useState('')
   const [buyIn, setBuyIn] = useState(String(DEFAULT_BUYIN))
+  const [rebuy, setRebuy] = useState('')
   const [selected, setSelected] = useState([]) // ids do elenco
   const [newName, setNewName] = useState('')
   const [mode, setMode] = useState('top_winner')
@@ -58,7 +61,7 @@ export default function CreateTableScreen() {
 
   async function handleCreate() {
     if (selectedPlayers.length === 0) {
-      setError('Escolha pelo menos um jogador.')
+      setError(t('create.pickOne'))
       return
     }
     setBusy(true)
@@ -66,6 +69,8 @@ export default function CreateTableScreen() {
     const { data, error } = await createTable({
       name,
       buyIn: parseMoney(buyIn, { min: 0, fallback: DEFAULT_BUYIN }),
+      // Vazio = rebuy pelo mesmo valor da entrada.
+      rebuy: rebuy.trim() === '' ? null : parseMoney(rebuy, { min: 0, fallback: 0 }),
       players: selectedPlayers,
       settlementMode: mode,
       settlementPlayerId: mode === 'fixed_player' ? effectiveCollectorId : null,
@@ -84,23 +89,23 @@ export default function CreateTableScreen() {
     <div className="app-shell">
       <div className="app">
         <div className="screen-top">
-          <button className="back-link" onClick={() => navigate('/')}>← Voltar</button>
-          <span className="screen-title">Nova mesa</span>
+          <button className="back-link" onClick={() => navigate('/')}>{t('common.back')}</button>
+          <span className="screen-title">{t('create.title')}</span>
         </div>
 
         <div className="rail">
           <div className="card">
             <label className="auth-field">
-              <span>Nome da mesa (opcional)</span>
+              <span>{t('create.nameLabel')}</span>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Mesa de Poker"
+                placeholder={t('create.namePlaceholder')}
               />
             </label>
 
             <label className="auth-field">
-              <span>Valor do cacife</span>
+              <span>{t('create.buyInLabel')}</span>
               <input
                 type="number"
                 step="0.01"
@@ -111,13 +116,27 @@ export default function CreateTableScreen() {
               />
             </label>
 
-            <div className="section-title">Jogadores</div>
+            <label className="auth-field">
+              <span>{t('create.rebuyLabel')}</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                inputMode="decimal"
+                value={rebuy}
+                onChange={(e) => setRebuy(e.target.value)}
+                placeholder={t('create.rebuyPlaceholder', { value: buyIn || DEFAULT_BUYIN })}
+              />
+              <small className="field-hint">{t('create.rebuyHint')}</small>
+            </label>
 
-            {rosterLoading && <div className="empty-state">Carregando elenco…</div>}
+            <div className="section-title">{t('create.players')}</div>
+
+            {rosterLoading && <div className="empty-state">{t('create.loadingRoster')}</div>}
 
             {!rosterLoading && roster.length === 0 && (
               <div className="empty-state">
-                Você ainda não tem jogadores salvos.<br />Adicione o primeiro abaixo.
+                {t('create.emptyRoster')}<br />{t('create.emptyRosterHint')}
               </div>
             )}
 
@@ -133,7 +152,7 @@ export default function CreateTableScreen() {
                   </button>
                   <button
                     className="roster-del"
-                    title={`Excluir ${p.name} do elenco`}
+                    title={t('create.deleteRosterTitle', { name: p.name })}
                     onClick={() => setDeletingRoster(p)}
                   >
                     ✕
@@ -146,20 +165,20 @@ export default function CreateTableScreen() {
               <input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="Novo jogador"
+                placeholder={t('create.newPlayer')}
               />
-              <button type="submit" className="roster-add-btn">Adicionar</button>
+              <button type="submit" className="roster-add-btn">{t('create.add')}</button>
             </form>
 
-            <div className="section-title">Quem recebe o dinheiro</div>
+            <div className="section-title">{t('create.whoReceives')}</div>
             <div className="theme-list">
               <button
                 className={`theme-option${mode === 'top_winner' ? ' active' : ''}`}
                 onClick={() => setMode('top_winner')}
               >
                 <span className="theme-name">
-                  Maior ganhador (padrão)
-                  <small>Quem mais ganhou recebe de todos e repassa aos outros ganhadores.</small>
+                  {t('create.topWinner')}
+                  <small>{t('create.topWinnerHint')}</small>
                 </span>
                 {mode === 'top_winner' && <span className="theme-check">✓</span>}
               </button>
@@ -169,8 +188,8 @@ export default function CreateTableScreen() {
                 disabled={selectedPlayers.length === 0}
               >
                 <span className="theme-name">
-                  Jogador fixo
-                  <small>O anfitrião (ou quem você escolher) centraliza o acerto.</small>
+                  {t('create.fixedPlayer')}
+                  <small>{t('create.fixedPlayerHint')}</small>
                 </span>
                 {mode === 'fixed_player' && <span className="theme-check">✓</span>}
               </button>
@@ -182,14 +201,14 @@ export default function CreateTableScreen() {
                 value={effectiveCollectorId}
                 onChange={(e) => setCollectorId(e.target.value)}
               >
-                <option value="">Escolha o jogador…</option>
+                <option value="">{t('create.choosePlayer')}</option>
                 {selectedPlayers.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
             )}
 
-            <div className="section-title">Opções da mesa</div>
+            <div className="section-title">{t('create.options')}</div>
             <label className="switch-row">
               <input
                 type="checkbox"
@@ -197,11 +216,8 @@ export default function CreateTableScreen() {
                 onChange={(e) => setShuffleSeats(e.target.checked)}
               />
               <span>
-                Sortear os lugares
-                <small>
-                  Embaralha a ordem dos jogadores ao criar a mesa. Sentem-se seguindo a
-                  lista: quem ficar em primeiro é o primeiro dealer.
-                </small>
+                {t('create.shuffle')}
+                <small>{t('create.shuffleHint')}</small>
               </span>
             </label>
             <label className="switch-row">
@@ -211,10 +227,8 @@ export default function CreateTableScreen() {
                 onChange={(e) => setAllowGuestPayments(e.target.checked)}
               />
               <span>
-                Jogadores podem marcar pagamento pelo link
-                <small>
-                  Desligado, o link do acerto vira só consulta e quem marca é você.
-                </small>
+                {t('create.guestPayments')}
+                <small>{t('create.guestPaymentsHint')}</small>
               </span>
             </label>
 
@@ -228,7 +242,7 @@ export default function CreateTableScreen() {
             onClick={handleCreate}
             disabled={busy || selectedPlayers.length === 0 || (mode === 'fixed_player' && !effectiveCollectorId)}
           >
-            {busy ? 'Criando…' : `Criar mesa (${selectedPlayers.length})`}
+            {busy ? t('create.creating') : t('create.submit', { count: selectedPlayers.length })}
           </button>
         </div>
       </div>

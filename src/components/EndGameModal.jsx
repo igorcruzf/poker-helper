@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { fmt } from '../utils.js'
 import { EPS } from '../lib/settlement.js'
+import { useI18n } from '../hooks/useI18n.js'
 
 // `previewFor(balanceMode)` recalcula o acerto conforme a escolha de fechamento.
 export default function EndGameModal({ open, players, total, previewFor, guestPayments, onCancel, onConfirm }) {
+  const { t } = useI18n()
   // null = ainda não escolheu como fechar a conta.
   const [balanceMode, setBalanceMode] = useState(null)
   const [withLink, setWithLink] = useState(true)
@@ -25,23 +27,23 @@ export default function EndGameModal({ open, players, total, previewFor, guestPa
       <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) handleCancel() }}>
         <div className="modal">
           <button className="close-x" onClick={handleCancel}>✕</button>
-          <p className="question">O saldo total não é zero</p>
+          <p className="question">{t('endGame.unbalancedTitle')}</p>
           <div className="share-text" style={{ textAlign: 'center' }}>
-            Total atual: {fmt(total)}.{'\n'}Como deseja encerrar o jogo?
+            {t('endGame.unbalancedBody', { total: fmt(total) })}
           </div>
           <button className="reset-choice-btn keep" onClick={() => setBalanceMode('even')}>
-            Distribuir igualmente
-            <small>Aplica a diferença dividida por igual entre todos os jogadores.</small>
+            {t('endGame.even')}
+            <small>{t('endGame.evenHint')}</small>
           </button>
           <button className="reset-choice-btn keep" onClick={() => setBalanceMode('top')}>
-            Ajustar no maior saldo
-            <small>Desconta a diferença do maior saldo (dividida por igual se houver empate).</small>
+            {t('endGame.top')}
+            <small>{t('endGame.topHint')}</small>
           </button>
           <button className="reset-choice-btn full" onClick={() => setBalanceMode('ignore')}>
-            Encerrar mesmo assim
-            <small>Ignora a diferença; ela fica toda com quem centraliza o acerto.</small>
+            {t('endGame.ignore')}
+            <small>{t('endGame.ignoreHint')}</small>
           </button>
-          <button className="reset-cancel-link" onClick={handleCancel}>Cancelar</button>
+          <button className="reset-cancel-link" onClick={handleCancel}>{t('common.cancel')}</button>
         </div>
       </div>
     )
@@ -55,35 +57,35 @@ export default function EndGameModal({ open, players, total, previewFor, guestPa
   return (
     <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) handleCancel() }}>
       <div className="modal modal-wide">
-        <p className="question">Encerrar jogo?</p>
+        <p className="question">{t('endGame.title')}</p>
         <p className="modal-hint" style={{ textAlign: 'center' }}>
-          A mesa vai para o histórico e o resumo é copiado. Você marca quem pagou depois.
+          {t('endGame.hint')}
         </p>
 
         {preview?.collectorId && (
           <div className="settle-collector">
-            Centraliza o acerto: <strong>{nameOf(preview.collectorId)}</strong>
+            {t('endGame.collector')} <strong>{nameOf(preview.collectorId)}</strong>
           </div>
         )}
 
         {Math.abs(imbalance) > EPS && (
           <div className="auth-error">
-            Conta aberta em {fmt(imbalance)} — essa diferença fica com quem centraliza.
+            {t('endGame.openAccount', { amount: fmt(imbalance) })}
           </div>
         )}
 
         <div className="settle-list">
           {transfers.length === 0 && (
-            <div className="empty-state">Ninguém deve nada a ninguém.</div>
+            <div className="empty-state">{t('endGame.nobodyOwes')}</div>
           )}
-          {transfers.map((t, i) => (
+          {transfers.map((transfer, i) => (
             <div className="settle-row" key={i}>
               <span className="settle-flow">
-                <strong>{nameOf(t.fromId)}</strong>
-                <span className="settle-arrow">paga para</span>
-                <strong>{nameOf(t.toId)}</strong>
+                <strong>{nameOf(transfer.fromId)}</strong>
+                <span className="settle-arrow">{t('settle.paysTo')}</span>
+                <strong>{nameOf(transfer.toId)}</strong>
               </span>
-              <span className="settle-amount">{fmt(t.amount)}</span>
+              <span className="settle-amount">{fmt(transfer.amount)}</span>
             </div>
           ))}
         </div>
@@ -91,18 +93,16 @@ export default function EndGameModal({ open, players, total, previewFor, guestPa
         <label className="switch-row">
           <input type="checkbox" checked={withLink} onChange={(e) => setWithLink(e.target.checked)} />
           <span>
-            Incluir o link do acerto no resumo
+            {t('endGame.withLink')}
             <small>
-              {guestPayments
-                ? 'Quem abrir não precisa de conta e pode marcar o próprio pagamento.'
-                : 'Quem abrir vê o acerto sem precisar de conta; marcar pagamento é só seu.'}
+              {guestPayments ? t('endGame.withLinkGuest') : t('endGame.withLinkReadOnly')}
             </small>
           </span>
         </label>
 
         {needsBalance && (
           <button className="reset-cancel-link" onClick={() => setBalanceMode(null)}>
-            ← Trocar como fechar a conta
+            {t('endGame.changeMode')}
           </button>
         )}
 

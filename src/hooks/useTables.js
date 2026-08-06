@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
-import { shuffle } from '../utils.js'
+import { computeSaldo, shuffle } from '../utils.js'
 import { useAuth } from './useAuth.jsx'
 
 const TABLE_SELECT = `
-  id, name, buy_in, status, settlement_mode, settlement_player_id,
+  id, name, buy_in, rebuy_value, status, settlement_mode, settlement_player_id,
   share_token, allow_guest_payments, created_at, finished_at,
   table_players ( id, player_id, name, cacifes, adjustment, position ),
   settlements ( id, from_table_player_id, to_table_player_id, amount, paid, paid_at )
@@ -39,6 +39,7 @@ export function useTables() {
   async function createTable({
     name,
     buyIn,
+    rebuy,
     players,
     settlementMode,
     settlementPlayerId,
@@ -53,6 +54,7 @@ export function useTables() {
         owner_id: user.id,
         name: name?.trim() || null,
         buy_in: buyIn,
+        rebuy_value: rebuy === null || rebuy === undefined ? null : rebuy,
         settlement_mode: settlementMode || 'top_winner',
         settlement_player_id: settlementMode === 'fixed_player' ? settlementPlayerId : null,
         allow_guest_payments: allowGuestPayments,
@@ -104,7 +106,11 @@ export function tablesToHistory(tables) {
     players: (t.table_players || []).map((p) => ({
       name: p.name,
       cacifes: p.cacifes,
-      saldo: Number(p.adjustment) - p.cacifes * Number(t.buy_in),
+      saldo: computeSaldo(
+        { adjustment: Number(p.adjustment), cacifes: p.cacifes },
+        Number(t.buy_in),
+        t.rebuy_value === null ? null : Number(t.rebuy_value)
+      ),
     })),
   }))
 }

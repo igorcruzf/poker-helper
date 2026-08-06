@@ -40,12 +40,19 @@ export function onAlertPrefsChange(fn) {
 export function fireAlert(options = {}) {
   const prefs = readAlertPrefs()
   if (prefs.sound) playBeep(options.beep)
-  if (prefs.vibrate && canVibrate) {
-    try {
-      navigator.vibrate(options.pattern || [180, 90, 180])
-    } catch {
-      /* ignore */
-    }
+  if (prefs.vibrate) vibrate(options.pattern)
+}
+
+// Retorna false quando o navegador recusa. Ele recusa em três situações que não
+// dá para contornar por código: aba em segundo plano (o caso do timer com a tela
+// apagada), documento sem interação prévia do usuário, e vibração desligada no
+// sistema. Por isso existe o botão de testar — ali o toque é a interação.
+export function vibrate(pattern) {
+  if (!canVibrate) return false
+  try {
+    return navigator.vibrate(pattern || [180, 90, 180]) !== false
+  } catch {
+    return false
   }
 }
 

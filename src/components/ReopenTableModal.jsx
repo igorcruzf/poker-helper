@@ -1,15 +1,17 @@
+import { useI18n } from '../hooks/useI18n.js'
+
 export default function ReopenTableModal({ open, hasPayments, onCancel, onConfirm }) {
+  const { t } = useI18n()
   if (!open) return null
 
   return (
     <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}>
       <div className="modal">
-        <p className="question">Reabrir a mesa?</p>
+        <p className="question">{t('settle.reopenTitle')}</p>
         <p className="modal-hint" style={{ textAlign: 'center' }}>
-          Ela volta a aceitar cacifes e ajustes. O acerto atual é descartado
-          {hasPayments && <strong> — inclusive as marcações de quem já pagou</strong>} e
-          um novo é gerado quando você encerrar de novo. Os saldos continuam
-          como estão.
+          {t('settle.reopenHint')}
+          {hasPayments && <strong>{t('settle.reopenHintPaid')}</strong>}
+          {t('settle.reopenHintEnd')}
         </p>
         <div className="modal-actions">
           <div className="round-action cancel" onClick={onCancel}>✕</div>

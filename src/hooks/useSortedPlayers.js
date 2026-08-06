@@ -3,7 +3,7 @@ import { computeSaldo } from '../utils.js'
 
 // Column sort for the player list. Drag-and-drop reordering is only
 // meaningful with no active sort, so dragEnabled is derived here too.
-export function useSortedPlayers(players, buyIn) {
+export function useSortedPlayers(players, buyIn, rebuy) {
   const [sort, setSort] = useState({ key: null, dir: 'asc' })
 
   function toggleSort(key) {
@@ -30,8 +30,8 @@ export function useSortedPlayers(players, buyIn) {
         av = a.cacifes
         bv = b.cacifes
       } else {
-        av = computeSaldo(a, buyIn)
-        bv = computeSaldo(b, buyIn)
+        av = computeSaldo(a, buyIn, rebuy)
+        bv = computeSaldo(b, buyIn, rebuy)
       }
       return factor * (av - bv)
     })

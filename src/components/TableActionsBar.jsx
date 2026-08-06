@@ -1,3 +1,5 @@
+import { useI18n } from '../hooks/useI18n.js'
+
 const ICONS = {
   player: (
     <>
@@ -47,12 +49,13 @@ function BarButton({ icon, label, badge, highlight, onClick }) {
 // Ações do meio do jogo, sempre ao alcance do polegar. Encerrar fica por último,
 // separado do resto para não ser clicado sem querer.
 export default function TableActionsBar({ onAddPlayer, onOpenTimer, onOpenTimeBank, onEndGame, timerActive, timeBankActive }) {
+  const { t } = useI18n()
   return (
     <div className="table-actions">
-      <BarButton icon="player" label="Jogador" onClick={onAddPlayer} />
-      <BarButton icon="timer" label="Timer" badge={timerActive} onClick={onOpenTimer} />
-      <BarButton icon="bank" label="Time bank" badge={timeBankActive} onClick={onOpenTimeBank} />
-      <BarButton icon="end" label="Encerrar" highlight onClick={onEndGame} />
+      <BarButton icon="player" label={t('table.actionPlayer')} onClick={onAddPlayer} />
+      <BarButton icon="timer" label={t('table.actionTimer')} badge={timerActive} onClick={onOpenTimer} />
+      <BarButton icon="bank" label={t('table.actionTimeBank')} badge={timeBankActive} onClick={onOpenTimeBank} />
+      <BarButton icon="end" label={t('table.actionEnd')} highlight onClick={onEndGame} />
     </div>
   )
 }

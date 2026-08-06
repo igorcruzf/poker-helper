@@ -263,3 +263,54 @@ as $$
 $$;
 
 grant execute on function public.get_shared_settlement(uuid) to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 8. Rebuy com valor proprio
+--    O primeiro cacife custa `buy_in`; os seguintes custam `rebuy_value`.
+--    Nulo = rebuy pelo mesmo valor da entrada (comportamento antigo, entao as
+--    mesas ja existentes continuam calculando igual).
+-- ---------------------------------------------------------------------------
+alter table public.poker_tables
+  add column if not exists rebuy_value numeric(10,2) check (rebuy_value >= 0);
+
+create or replace function public.get_shared_settlement(p_token uuid)
+returns jsonb
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select jsonb_build_object(
+    'table', jsonb_build_object(
+      'id', t.id,
+      'name', t.name,
+      'buy_in', t.buy_in,
+      'rebuy_value', t.rebuy_value,
+      'status', t.status,
+      'created_at', t.created_at,
+      'finished_at', t.finished_at,
+      'allow_guest_payments', t.allow_guest_payments,
+      'timer_state', t.timer_state
+    ),
+    'players', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'id', tp.id, 'name', tp.name, 'cacifes', tp.cacifes,
+        'adjustment', tp.adjustment, 'position', tp.position
+      ) order by tp.position)
+      from table_players tp where tp.table_id = t.id
+    ), '[]'::jsonb),
+    'settlements', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'id', s.id,
+        'from_table_player_id', s.from_table_player_id,
+        'to_table_player_id', s.to_table_player_id,
+        'amount', s.amount, 'paid', s.paid, 'paid_at', s.paid_at
+      ) order by s.created_at)
+      from settlements s where s.table_id = t.id
+    ), '[]'::jsonb)
+  )
+  from poker_tables t
+  where t.share_token = p_token;
+$$;
+
+grant execute on function public.get_shared_settlement(uuid) to anon, authenticated;

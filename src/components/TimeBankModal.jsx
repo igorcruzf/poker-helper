@@ -1,6 +1,8 @@
 import AlertToggles from './AlertToggles.jsx'
+import { useI18n } from '../hooks/useI18n.js'
 
 export default function TimeBankModal({ open, timeBank, onClose }) {
+  const { t } = useI18n()
   if (!open) return null
 
   const { secondsLeft, running, done, duration, start, stop, dismiss } = timeBank
@@ -9,22 +11,25 @@ export default function TimeBankModal({ open, timeBank, onClose }) {
     <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal">
         <button className="close-x" onClick={onClose}>✕</button>
-        <p className="question">Time bank</p>
+        <p className="question">{t('timeBank.title')}</p>
 
         <div className="timer-display">{String(secondsLeft).padStart(2, '0')}</div>
-        <div className="timer-blinds">{duration} segundos para decidir</div>
+        <div className="timer-blinds">{t('timeBank.seconds', { count: duration })}</div>
 
         {done ? (
           <div className="timer-confirm">
-            <p className="modal-hint" style={{ textAlign: 'center' }}>⏰ Tempo esgotado!</p>
-            <button className="timer-btn" onClick={dismiss}>Fechar</button>
+            <p className="modal-hint" style={{ textAlign: 'center' }}>{t('timeBank.timeUp')}</p>
+            <div className="timer-actions">
+              <button className="timer-btn" onClick={start}>{t('timeBank.restart')}</button>
+              <button className="timer-btn secondary" onClick={dismiss}>{t('timeBank.close')}</button>
+            </div>
           </div>
         ) : (
           <>
             <AlertToggles />
             <div className="timer-actions">
-              <button className="timer-btn" onClick={start}>{running ? 'Reiniciar' : 'Iniciar'}</button>
-              {running && <button className="timer-btn secondary" onClick={stop}>Parar</button>}
+              <button className="timer-btn" onClick={start}>{running ? t('timeBank.restart') : t('timeBank.start')}</button>
+              {running && <button className="timer-btn secondary" onClick={stop}>{t('timeBank.stop')}</button>}
             </div>
           </>
         )}

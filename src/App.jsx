@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth.jsx'
 import { isSupabaseConfigured } from './lib/supabase.js'
 import { startQueueFlusher } from './lib/syncQueue.js'
 import { useTheme } from './hooks/useTheme.js'
+import { useI18n } from './hooks/useI18n.js'
 
 import LoginScreen from './screens/LoginScreen.jsx'
 import TablesScreen from './screens/TablesScreen.jsx'
@@ -15,27 +16,23 @@ import SharedSettlementScreen from './screens/SharedSettlementScreen.jsx'
 import SharedTableScreen from './screens/SharedTableScreen.jsx'
 import HandRankingScreen from './components/HandRankingScreen.jsx'
 
-function Splash({ children }) {
+function Splash() {
+  const { t } = useI18n()
   return (
     <div className="app-shell">
-      <div className="app"><div className="empty-state">{children}</div></div>
+      <div className="app"><div className="empty-state">{t('common.loading')}</div></div>
     </div>
   )
 }
 
 function ConfigMissing() {
+  const { t } = useI18n()
   return (
     <div className="app-shell">
       <div className="app">
         <div className="card" style={{ marginTop: 24 }}>
-          <p className="question">Falta configurar o Supabase</p>
-          <p className="modal-hint">
-            Crie um arquivo <code>.env</code> na raiz do projeto (veja <code>.env.example</code>) com
-            <code> VITE_SUPABASE_URL</code> e <code>VITE_SUPABASE_PUBLISHABLE_KEY</code> (ou
-            <code> VITE_SUPABASE_ANON_KEY</code>), e <strong>reinicie</strong> o <code>npm run dev</code> —
-            o Vite só lê o <code>.env</code> ao subir. Na Vercel, as mesmas variáveis vão em
-            Settings → Environment Variables, seguidas de um novo deploy.
-          </p>
+          <p className="question">{t('config.title')}</p>
+          <p className="modal-hint">{t('config.body')}</p>
         </div>
       </div>
     </div>
@@ -44,14 +41,14 @@ function ConfigMissing() {
 
 function RequireAuth({ children }) {
   const { session, loading } = useAuth()
-  if (loading) return <Splash>Carregando…</Splash>
+  if (loading) return <Splash />
   if (!session) return <Navigate to="/login" replace />
   return children
 }
 
 function LoginRoute() {
   const { session, loading } = useAuth()
-  if (loading) return <Splash>Carregando…</Splash>
+  if (loading) return <Splash />
   if (session) return <Navigate to="/" replace />
   return <LoginScreen />
 }

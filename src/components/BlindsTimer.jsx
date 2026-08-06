@@ -1,7 +1,9 @@
 import { parseMoney } from '../utils.js'
+import { useI18n } from '../hooks/useI18n.js'
 import AlertToggles from './AlertToggles.jsx'
 
 export default function BlindsTimerModal({ open, timer, onClose }) {
+  const { t } = useI18n()
   if (!open) return null
 
   const {
@@ -19,24 +21,24 @@ export default function BlindsTimerModal({ open, timer, onClose }) {
 	<div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
 	  <div className="modal">
 		<button className="close-x" onClick={onClose}>✕</button>
-		<p className="question">Timer de blinds</p>
+		<p className="question">{t('timer.title')}</p>
 
 		<div className="timer-display">{mm}:{ss}</div>
 		<div className="timer-blinds">
-		  Nível {level + 1} · Blinds {smallBlind} / {bigBlind}
+		  {t('timer.levelInfo', { level: level + 1, small: smallBlind, big: bigBlind })}
 		</div>
 
 		{awaitingConfirm ? (
 		  <div className="timer-confirm">
 			<p className="modal-hint" style={{ textAlign: 'center' }}>
-			  ⏰ Tempo esgotado! Próximo nível: {nextSmall} / {nextSmall * 2}
+			  {t('timer.timeUp', { small: nextSmall, big: nextSmall * 2 })}
 			</p>
-			<button className="timer-btn" onClick={confirmNext}>Ir para o próximo nível</button>
+			<button className="timer-btn" onClick={confirmNext}>{t('timer.nextLevel')}</button>
 		  </div>
 		) : (
 		  <>
 			<div className="modal-field">
-			  <label>Blind inicial (small)</label>
+			  <label>{t('timer.baseBlind')}</label>
 			  <input
 				type="number"
 				min="0"
@@ -49,7 +51,7 @@ export default function BlindsTimerModal({ open, timer, onClose }) {
 			</div>
 
 			<div className="modal-field">
-			  <label>Minutos por nível</label>
+			  <label>{t('timer.minutes')}</label>
 			  <input
 				type="number"
 				min="1"
@@ -60,17 +62,15 @@ export default function BlindsTimerModal({ open, timer, onClose }) {
 			  />
 			</div>
 
-			<p className="modal-hint">
-			  O big blind é o dobro do small, e cada nível dobra o valor do anterior.
-			</p>
+			<p className="modal-hint">{t('timer.hint')}</p>
 
 			<AlertToggles />
 
 			<div className="timer-actions">
 			  <button className="timer-btn" onClick={running ? pause : start}>
-				{running ? 'Pausar' : active ? 'Continuar' : 'Iniciar'}
+				{running ? t('timer.pause') : active ? t('timer.resume') : t('timer.start')}
 			  </button>
-			  <button className="timer-btn secondary" onClick={reset}>Zerar</button>
+			  <button className="timer-btn secondary" onClick={reset}>{t('timer.reset')}</button>
 			</div>
 		  </>
 		)}

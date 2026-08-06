@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useInstallPrompt } from '../hooks/useInstallPrompt.js'
-import { useTheme } from '../hooks/useTheme.js'
 import { useBlindsTimer } from '../hooks/useBlindsTimer.js'
 import { useTimeBank } from '../hooks/useTimeBank.js'
 import { useTable } from '../hooks/useTable.js'
@@ -11,14 +9,14 @@ import { useSortedPlayers } from '../hooks/useSortedPlayers.js'
 import { useDragReorder } from '../hooks/useDragReorder.js'
 import { onPendingChange } from '../lib/syncQueue.js'
 import { buildSummaryText, copyText, liveUrlFor, shareUrlFor } from '../lib/summary.js'
+import { useI18n } from '../hooks/useI18n.js'
 
-import Header from '../components/Header.jsx'
+import AppChrome from '../components/AppChrome.jsx'
 import BuyInRow from '../components/BuyInRow.jsx'
 import PlayerRow from '../components/PlayerRow.jsx'
 import TotalRow from '../components/TotalRow.jsx'
 import DeleteModal from '../components/DeleteModal.jsx'
 import AdjustModal from '../components/AdjustModal.jsx'
-import ThemeModal from '../components/ThemeModal.jsx'
 import BlindsTimerModal from '../components/BlindsTimer.jsx'
 import TimeBankModal from '../components/TimeBankModal.jsx'
 import EndGameModal from '../components/EndGameModal.jsx'
@@ -31,20 +29,17 @@ export default function TableScreen() {
   const navigate = useNavigate()
   const { signOut, user } = useAuth()
   const {
-    table, players, buyIn, total, loading, error,
-    handleBuyInChange, handleBuyInBlur,
+    table, players, buyIn, rebuy, total, loading, error,
     addPlayer, changeCacife, deletePlayer, adjustPlayer, reorderPlayers,
     previewSettlement, endGame, undo, canUndo, saveTimerState,
   } = useTable(id)
 
-  const [theme, setTheme] = useTheme()
+  const { t } = useI18n()
   const timer = useBlindsTimer(saveTimerState)
   const timeBank = useTimeBank()
-  const { canInstall, promptInstall } = useInstallPrompt()
   const {
     deletingPlayer, setDeletingPlayer,
     adjustingPlayer, setAdjustingPlayer,
-    themeOpen, setThemeOpen,
     timerOpen, setTimerOpen,
     timeBankOpen, setTimeBankOpen,
     endGameOpen, setEndGameOpen,
@@ -52,7 +47,7 @@ export default function TableScreen() {
   const [addOpen, setAddOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [pending, setPending] = useState(0)
-  const { sort, sortedPlayers, toggleSort, sortArrow, dragEnabled } = useSortedPlayers(players, buyIn)
+  const { sort, sortedPlayers, toggleSort, sortArrow, dragEnabled } = useSortedPlayers(players, buyIn, rebuy)
   const { dragId, handleDragStart, handleDragOver, handleDrop, handleDragEnd } = useDragReorder(reorderPlayers)
 
   useEffect(() => onPendingChange(setPending), [])
@@ -75,6 +70,7 @@ export default function TableScreen() {
         balanceMode,
         withSettlement: true,
         settlementMode: table.settlement_mode,
+        rebuy,
         collectorId: previewSettlement(balanceMode).collectorId,
         shareUrl: withLink ? shareUrlFor(table.share_token) : '',
       })
@@ -88,7 +84,7 @@ export default function TableScreen() {
   if (loading) {
     return (
       <div className="app-shell">
-        <div className="app"><div className="empty-state">Carregando mesa…</div></div>
+        <div className="app"><div className="empty-state">{t('common.loading')}</div></div>
       </div>
     )
   }
@@ -97,9 +93,9 @@ export default function TableScreen() {
     return (
       <div className="app-shell">
         <div className="app">
-          <div className="empty-state">Não foi possível abrir a mesa.<br />{error}</div>
+          <div className="empty-state">{t('table.loadFailed')}<br />{error}</div>
           <div className="footer-actions">
-            <button className="add-player-btn" onClick={() => navigate('/')}>Minhas mesas</button>
+            <button className="add-player-btn" onClick={() => navigate('/')}>{t('settle.myTables')}</button>
           </div>
         </div>
       </div>
@@ -109,36 +105,33 @@ export default function TableScreen() {
   return (
     <div className="app-shell">
       <div className="app">
-        <Header
+        <AppChrome
           onOpenRanking={() => navigate('/ranking')}
           onOpenTables={() => navigate('/')}
-          onOpenThemes={() => setThemeOpen(true)}
           onLogout={signOut}
           userEmail={user?.email}
-          canInstall={canInstall}
-          onInstall={promptInstall}
           subtitle={table.name}
           onShare={() => setShareOpen(true)}
         />
 
         {pending > 0 && (
-          <div className="sync-flag">Sem conexão — {pending} alteração(ões) serão salvas ao voltar.</div>
+          <div className="sync-flag">{t('table.offline', { count: pending })}</div>
         )}
 
         {timer.active && (
           <button
             className={`timer-bar${timer.awaitingConfirm ? ' alert' : ''}`}
             onClick={() => setTimerOpen(true)}
-            title="Abrir timer de blinds"
+            title={t('table.openTimer')}
           >
             <span className="timer-bar-time">
               {String(Math.floor(timer.secondsLeft / 60)).padStart(2, '0')}:
               {String(timer.secondsLeft % 60).padStart(2, '0')}
             </span>
             <span className="timer-bar-info">
-              Nível {timer.level + 1} · {timer.smallBlind}/{timer.bigBlind}
+              {t('table.level', { level: timer.level + 1, small: timer.smallBlind, big: timer.bigBlind })}
             </span>
-            {timer.awaitingConfirm && <span className="timer-bar-flag">⏰ Confirmar</span>}
+            {timer.awaitingConfirm && <span className="timer-bar-flag">{t('table.confirmFlag')}</span>}
           </button>
         )}
 
@@ -146,17 +139,17 @@ export default function TableScreen() {
           <button
             className={`timer-bar${timeBank.done ? ' alert' : ''}`}
             onClick={() => setTimeBankOpen(true)}
-            title="Abrir time bank"
+            title={t('table.openTimeBank')}
           >
             <span className="timer-bar-time">{String(timeBank.secondsLeft).padStart(2, '0')}</span>
-            <span className="timer-bar-info">Time bank</span>
-            {timeBank.done && <span className="timer-bar-flag">⏰ Esgotado</span>}
+            <span className="timer-bar-info">{t('table.timeBank')}</span>
+            {timeBank.done && <span className="timer-bar-flag">{t('table.timeBankOver')}</span>}
           </button>
         )}
 
         <div className="rail">
           <div className="card">
-            <BuyInRow buyIn={buyIn} onChange={handleBuyInChange} onBlur={handleBuyInBlur} />
+            <BuyInRow buyIn={buyIn} rebuy={rebuy} />
 
             {players.length > 0 && (
               <div className="col-labels">
@@ -165,19 +158,19 @@ export default function TableScreen() {
                   className={`sortable${sort.key === 'nome' ? ' active' : ''}`}
                   onClick={() => toggleSort('nome')}
                 >
-                  Nome{sortArrow('nome')}
+                  {t('table.name')}{sortArrow('nome')}
                 </span>
                 <span
                   className={`sortable${sort.key === 'cacifes' ? ' active' : ''}`}
                   onClick={() => toggleSort('cacifes')}
                 >
-                  Cacifes{sortArrow('cacifes')}
+                  {t('table.cacifes')}{sortArrow('cacifes')}
                 </span>
                 <span
                   className={`sortable${sort.key === 'saldo' ? ' active' : ''}`}
                   onClick={() => toggleSort('saldo')}
                 >
-                  Saldo{sortArrow('saldo')}
+                  {t('table.saldo')}{sortArrow('saldo')}
                 </span>
               </div>
             )}
@@ -188,6 +181,7 @@ export default function TableScreen() {
                   key={p.id}
                   player={p}
                   buyIn={buyIn}
+                  rebuy={rebuy}
                   onCacifeChange={changeCacife}
                   onDelete={setDeletingPlayer}
                   onOpenAdjust={setAdjustingPlayer}
@@ -203,7 +197,7 @@ export default function TableScreen() {
 
             {players.length === 0 && (
               <div className="empty-state">
-                Nenhum jogador na mesa.<br />Toque em "Jogador" na barra abaixo para adicionar.
+                {t('table.empty')}<br />{t('table.emptyHint')}
               </div>
             )}
 
@@ -213,8 +207,8 @@ export default function TableScreen() {
 
         <div className="table-dock">
           {canUndo && (
-            <button className="undo-strip" onClick={undo} title="Desfazer última ação">
-              ↩ Desfazer última ação
+            <button className="undo-strip" onClick={undo} title={t('table.undo')}>
+              {t('table.undo')}
             </button>
           )}
           <TableActionsBar
@@ -250,15 +244,9 @@ export default function TableScreen() {
       <AdjustModal
         player={adjustingPlayer}
         buyIn={buyIn}
+        rebuy={rebuy}
         onCancel={() => setAdjustingPlayer(null)}
         onConfirm={(pid, delta) => { adjustPlayer(pid, delta); setAdjustingPlayer(null) }}
-      />
-
-      <ThemeModal
-        open={themeOpen}
-        theme={theme}
-        onSelect={setTheme}
-        onClose={() => setThemeOpen(false)}
       />
 
       <BlindsTimerModal open={timerOpen} timer={timer} onClose={() => setTimerOpen(false)} />

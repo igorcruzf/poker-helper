@@ -4,6 +4,7 @@ import { fmt, saldoClass, computeSaldo } from '../utils.js'
 export default function PlayerRow({
   player,
   buyIn,
+  rebuy,
   onCacifeChange,
   onDelete,
   onOpenAdjust,
@@ -14,7 +15,7 @@ export default function PlayerRow({
   onDragEnd,
   isDragging,
 }) {
-  const saldo = computeSaldo(player, buyIn)
+  const saldo = computeSaldo(player, buyIn, rebuy)
   const [bump, setBump] = useState(false)
   const firstRun = useRef(true)
 

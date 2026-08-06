@@ -1,13 +1,15 @@
+import { useI18n } from '../hooks/useI18n.js'
+
 export default function DeleteRosterPlayerModal({ player, onCancel, onConfirm }) {
+  const { t } = useI18n()
   if (!player) return null
 
   return (
     <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}>
       <div className="modal">
-        <p className="question">Excluir {player.name} do elenco?</p>
+        <p className="question">{t('create.deleteRoster', { name: player.name })}</p>
         <p className="modal-hint" style={{ textAlign: 'center' }}>
-          Some da lista de jogadores das próximas mesas. As mesas antigas ficam
-          intactas — nome, cacifes e saldos continuam no histórico.
+          {t('create.deleteRosterHint')}
         </p>
         <div className="modal-actions">
           <div className="round-action cancel" onClick={onCancel}>✕</div>

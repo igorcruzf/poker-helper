@@ -2,12 +2,10 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTables, tablesToHistory } from '../hooks/useTables.js'
 import { useAuth } from '../hooks/useAuth.jsx'
-import { useTheme } from '../hooks/useTheme.js'
-import { useInstallPrompt } from '../hooks/useInstallPrompt.js'
 import { computeOverview, computePlayerStats } from '../lib/stats.js'
 import { fmt, fmtDate, saldoClass } from '../utils.js'
-import Header from '../components/Header.jsx'
-import ThemeModal from '../components/ThemeModal.jsx'
+import AppChrome from '../components/AppChrome.jsx'
+import { useI18n } from '../hooks/useI18n.js'
 
 const MEDALS = ['🥇', '🥈', '🥉']
 
@@ -42,9 +40,7 @@ export default function StatsScreen() {
   const navigate = useNavigate()
   const { user, signOut } = useAuth()
   const { finishedTables, loading } = useTables()
-  const [theme, setTheme] = useTheme()
-  const { canInstall, promptInstall } = useInstallPrompt()
-  const [themeOpen, setThemeOpen] = useState(false)
+  const { t } = useI18n()
   const [tableView, setTableView] = useState(false)
 
   const history = tablesToHistory(finishedTables)
@@ -56,24 +52,21 @@ export default function StatsScreen() {
   return (
     <div className="app-shell">
       <div className="app">
-        <Header
+        <AppChrome
           onOpenTables={() => navigate('/')}
           onOpenRanking={() => navigate('/ranking')}
-          onOpenThemes={() => setThemeOpen(true)}
           onLogout={signOut}
           userEmail={user?.email}
-          canInstall={canInstall}
-          onInstall={promptInstall}
-          subtitle="Estatísticas"
+          subtitle={t('eyebrow.stats')}
         />
 
-        {loading && <div className="empty-state">Carregando…</div>}
+        {loading && <div className="empty-state">{t('common.loading')}</div>}
 
         {!loading && stats.length === 0 && (
           <div className="rail">
             <div className="card">
               <div className="empty-state">
-                Sem dados ainda.<br />Encerre algumas mesas para o placar aparecer.
+                {t('stats.empty')}<br />{t('stats.emptyHint')}
               </div>
             </div>
           </div>
@@ -82,14 +75,14 @@ export default function StatsScreen() {
         {!loading && stats.length > 0 && (
           <>
             <div className="stat-tiles">
-              <Tile label="Mesas" value={overview.tables} />
-              <Tile label="Jogadores" value={overview.players} />
-              <Tile label="Cacifes" value={overview.cacifes} detail={fmt(overview.volume)} />
+              <Tile label={t('stats.tables')} value={overview.tables} />
+              <Tile label={t('stats.players')} value={overview.players} />
+              <Tile label={t('stats.cacifes')} value={overview.cacifes} detail={fmt(overview.volume)} />
             </div>
 
             <div className="rail">
               <div className="card">
-                <div className="section-title">Pódio</div>
+                <div className="section-title">{t('stats.podium')}</div>
                 <div className="podium">
                   {podium.map((s, i) => (
                     <div className={`podium-slot p${i + 1}`} key={s.name}>
@@ -98,16 +91,18 @@ export default function StatsScreen() {
                       <span className={`podium-value ${saldoClass(s.totalSaldo)}`}>
                         {fmt(s.totalSaldo)}
                       </span>
-                      <span className="podium-meta">{s.nights} {s.nights === 1 ? 'noite' : 'noites'}</span>
+                      <span className="podium-meta">
+                        {s.nights} {t(s.nights === 1 ? 'common.night' : 'common.nights')}
+                      </span>
                     </div>
                   ))}
                 </div>
 
                 <div className="section-title">
-                  Saldo acumulado
+                  {t('stats.accumulated')}
                   <span className="chart-legend">
-                    <span className="legend-key pos" /> ganhou
-                    <span className="legend-key neg" /> perdeu
+                    <span className="legend-key pos" /> {t('stats.won')}
+                    <span className="legend-key neg" /> {t('stats.lost')}
                   </span>
                 </div>
 
@@ -116,7 +111,9 @@ export default function StatsScreen() {
                     <div
                       className="saldo-row"
                       key={s.name}
-                      title={`${s.name}: ${s.nights} noites · ${s.cacifes} cacifes · média ${fmt(s.avgSaldo)}`}
+                      title={t('stats.barTitle', {
+                        name: s.name, nights: s.nights, cacifes: s.cacifes, avg: fmt(s.avgSaldo),
+                      })}
                     >
                       <span className="saldo-row-name">{s.name}</span>
                       <SaldoBar saldo={s.totalSaldo} max={maxAbs} />
@@ -128,22 +125,24 @@ export default function StatsScreen() {
                 </div>
 
                 <button className="table-view-toggle" onClick={() => setTableView((v) => !v)}>
-                  {tableView ? 'Esconder tabela' : 'Ver como tabela'}
+                  {tableView ? t('stats.hideTable') : t('stats.showTable')}
                 </button>
 
                 {tableView && (
                   <div className="stats-list">
                     <div className="stats-row stats-head">
-                      <span>Jogador</span>
-                      <span>Noites</span>
-                      <span>Saldo total</span>
+                      <span>{t('stats.player')}</span>
+                      <span>{t('stats.nights')}</span>
+                      <span>{t('stats.totalSaldo')}</span>
                     </div>
                     {stats.map((s) => (
                       <div className="stats-row" key={s.name}>
                         <span className="stats-name">
                           {s.name}
                           <small>
-                            média {fmt(s.avgSaldo)} · {s.cacifes} cacifes · {s.winRate}% de noites no lucro
+                            {t('stats.rowDetail', {
+                              avg: fmt(s.avgSaldo), cacifes: s.cacifes, rate: s.winRate,
+                            })}
                           </small>
                         </span>
                         <span>{s.nights}</span>
@@ -157,24 +156,24 @@ export default function StatsScreen() {
 
             <div className="stat-tiles two">
               <Tile
-                label="Maior noite"
+                label={t('stats.bestNight')}
                 value={fmt(overview.best.saldo)}
                 detail={`${overview.best.name} · ${fmtDate(overview.best.date)}`}
                 tone="pos"
               />
               <Tile
-                label="Maior tombo"
+                label={t('stats.worstNight')}
                 value={fmt(overview.worst.saldo)}
                 detail={`${overview.worst.name} · ${fmtDate(overview.worst.date)}`}
                 tone="neg"
               />
               <Tile
-                label="Mais cacifes"
+                label={t('stats.mostCacifes')}
                 value={overview.mostCacifes.cacifes}
                 detail={overview.mostCacifes.name}
               />
               <Tile
-                label="Mais presente"
+                label={t('stats.mostPresent')}
                 value={overview.mostNights.nights}
                 detail={overview.mostNights.name}
               />
@@ -183,7 +182,6 @@ export default function StatsScreen() {
         )}
       </div>
 
-      <ThemeModal open={themeOpen} theme={theme} onSelect={setTheme} onClose={() => setThemeOpen(false)} />
     </div>
   )
 }

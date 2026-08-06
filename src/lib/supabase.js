@@ -21,15 +21,14 @@ export const supabase = isSupabaseConfigured
     })
   : null
 
-// Mensagens do Supabase chegam em inglês; traduz as mais comuns.
-export function authErrorMessage(error) {
-  if (!error) return ''
-  const msg = String(error.message || '')
-  if (/invalid login credentials/i.test(msg)) return 'E-mail ou senha inválidos.'
-  if (/email not confirmed/i.test(msg)) return 'Confirme o e-mail antes de entrar.'
-  if (/user already registered/i.test(msg)) return 'Esse e-mail já tem conta. Faça login.'
-  if (/password should be at least/i.test(msg)) return 'A senha precisa ter pelo menos 6 caracteres.'
-  if (/unable to validate email/i.test(msg) || /invalid email/i.test(msg)) return 'E-mail inválido.'
-  if (/rate limit/i.test(msg)) return 'Muitas tentativas. Espere um pouco e tente de novo.'
-  return msg || 'Algo deu errado. Tente de novo.'
+// Mensagens do Supabase chegam em ingles; mapeia para chave de traducao.
+export function authErrorKey(error) {
+  const msg = String(error?.message || '')
+  if (/invalid login credentials/i.test(msg)) return 'authError.credentials'
+  if (/email not confirmed/i.test(msg)) return 'authError.unconfirmed'
+  if (/user already registered/i.test(msg)) return 'authError.registered'
+  if (/password should be at least/i.test(msg)) return 'authError.shortPassword'
+  if (/unable to validate email/i.test(msg) || /invalid email/i.test(msg)) return 'authError.invalidEmail'
+  if (/rate limit/i.test(msg)) return 'authError.rateLimit'
+  return 'authError.generic'
 }

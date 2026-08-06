@@ -17,12 +17,12 @@ export function pickCollector(balances, mode, fixedId) {
   return balances.reduce((best, b) => (b.saldo > best.saldo ? b : best), balances[0])
 }
 
-export function toBalances(players, buyIn) {
+export function toBalances(players, buyIn, rebuy) {
   return players.map((p) => ({
     id: p.id,
     name: p.name,
     cacifes: p.cacifes,
-    saldo: round2(computeSaldo(p, buyIn)),
+    saldo: round2(computeSaldo(p, buyIn, rebuy)),
   }))
 }
 
@@ -30,8 +30,8 @@ export function toBalances(players, buyIn) {
 //   'even'   divide a diferença por igual entre todos
 //   'top'    desconta do maior saldo (rateado se houver empate)
 //   'ignore' deixa como está, e a sobra cai em quem centraliza
-export function balancePlayers(players, buyIn, mode) {
-  const base = toBalances(players, buyIn)
+export function balancePlayers(players, buyIn, mode, rebuy) {
+  const base = toBalances(players, buyIn, rebuy)
   const total = round2(base.reduce((acc, b) => acc + b.saldo, 0))
   if (base.length === 0 || !mode || mode === 'ignore' || Math.abs(total) <= EPS) return base
 
@@ -51,7 +51,8 @@ export function balancePlayers(players, buyIn, mode) {
 // Acerto em estrela: todo mundo que perdeu paga o centralizador, e ele repassa
 // para quem ganhou. Sempre gera no máximo (n-1) transferências.
 export function buildSettlement(players, buyIn, options = {}) {
-  return settlementFromBalances(balancePlayers(players, buyIn, options.balanceMode), options)
+  const balances = balancePlayers(players, buyIn, options.balanceMode, options.rebuy)
+  return settlementFromBalances(balances, options)
 }
 
 export function settlementFromBalances(balances, options = {}) {

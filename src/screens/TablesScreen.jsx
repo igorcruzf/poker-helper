@@ -2,70 +2,63 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTables } from '../hooks/useTables.js'
 import { useAuth } from '../hooks/useAuth.jsx'
-import { useTheme } from '../hooks/useTheme.js'
-import { useInstallPrompt } from '../hooks/useInstallPrompt.js'
 import { settlementProgress } from '../lib/settlement.js'
 import { fmt, fmtDate } from '../utils.js'
-import Header from '../components/Header.jsx'
-import ThemeModal from '../components/ThemeModal.jsx'
+import AppChrome from '../components/AppChrome.jsx'
 import DeleteTableModal from '../components/DeleteTableModal.jsx'
+import { useI18n } from '../hooks/useI18n.js'
 
 export default function TablesScreen() {
   const navigate = useNavigate()
   const { user, signOut } = useAuth()
   const { activeTable, finishedTables, loading, error, deleteTable } = useTables()
-  const [theme, setTheme] = useTheme()
-  const { canInstall, promptInstall } = useInstallPrompt()
-  const [themeOpen, setThemeOpen] = useState(false)
+  const { t } = useI18n()
   const [deleting, setDeleting] = useState(null)
   const [onlyPending, setOnlyPending] = useState(false)
 
-  const pendingCount = finishedTables.filter(
-    (t) => settlementProgress(t.settlements || []).pending > 0
-  ).length
-  const visibleTables = onlyPending
-    ? finishedTables.filter((t) => settlementProgress(t.settlements || []).pending > 0)
-    : finishedTables
+  const isPending = (table) => settlementProgress(table.settlements || []).pending > 0
+  const pendingCount = finishedTables.filter(isPending).length
+  const visibleTables = onlyPending ? finishedTables.filter(isPending) : finishedTables
 
   return (
     <div className="app-shell">
       <div className="app">
-        <Header
+        <AppChrome
           onOpenRanking={() => navigate('/ranking')}
           onOpenStats={() => navigate('/estatisticas')}
-          onOpenThemes={() => setThemeOpen(true)}
           onLogout={signOut}
           userEmail={user?.email}
-          canInstall={canInstall}
-          onInstall={promptInstall}
         />
 
         {error && <div className="auth-error">{error}</div>}
 
         {activeTable && (
           <button className="active-table-card" onClick={() => navigate(`/mesa/${activeTable.id}`)}>
-            <span className="active-table-flag">Mesa em andamento</span>
+            <span className="active-table-flag">{t('tables.activeFlag')}</span>
             <span className="active-table-name">
-              {activeTable.name || `Mesa de ${fmtDate(activeTable.created_at)}`}
+              {activeTable.name || t('tables.defaultName', { date: fmtDate(activeTable.created_at) })}
             </span>
             <span className="active-table-meta">
-              {activeTable.table_players?.length || 0} jogadores · cacife {fmt(activeTable.buy_in)}
+              {t('tables.playersAndBuyIn', {
+                count: activeTable.table_players?.length || 0,
+                buyIn: fmt(activeTable.buy_in),
+              })}
             </span>
-            <span className="active-table-cta">Continuar →</span>
+            <span className="active-table-cta">{t('tables.continue')}</span>
           </button>
         )}
 
         <div className="footer-actions">
           <button className="add-player-btn" onClick={() => navigate('/nova')}>
-            {activeTable ? 'Criar outra mesa' : 'Criar mesa'}
+            {activeTable ? t('tables.createAnother') : t('tables.create')}
           </button>
         </div>
 
         <div className="rail">
           <div className="card">
-            <div className="section-title">Mesas anteriores</div>
+            <div className="section-title">{t('tables.previous')}</div>
 
-            {loading && <div className="empty-state">Carregando…</div>}
+            {loading && <div className="empty-state">{t('common.loading')}</div>}
 
             {!loading && finishedTables.length > 0 && (
               <div className="filter-row">
@@ -73,51 +66,58 @@ export default function TablesScreen() {
                   className={`filter-chip${onlyPending ? '' : ' active'}`}
                   onClick={() => setOnlyPending(false)}
                 >
-                  Todas ({finishedTables.length})
+                  {t('tables.all', { count: finishedTables.length })}
                 </button>
                 <button
                   className={`filter-chip${onlyPending ? ' active' : ''}`}
                   onClick={() => setOnlyPending(true)}
                   disabled={pendingCount === 0}
                 >
-                  Acerto pendente ({pendingCount})
+                  {t('tables.pending', { count: pendingCount })}
                 </button>
               </div>
             )}
 
             {!loading && finishedTables.length === 0 && (
               <div className="empty-state">
-                Nenhuma mesa encerrada ainda.<br />Encerre um jogo para ver o acerto aqui.
+                {t('tables.empty')}<br />{t('tables.emptyHint')}
               </div>
             )}
 
             {!loading && finishedTables.length > 0 && visibleTables.length === 0 && (
-              <div className="empty-state">Nenhuma mesa com acerto pendente. 🎉</div>
+              <div className="empty-state">{t('tables.noPending')}</div>
             )}
 
             <div className="history-list">
-              {visibleTables.map((t) => {
-                const progress = settlementProgress(t.settlements || [])
+              {visibleTables.map((table) => {
+                const progress = settlementProgress(table.settlements || [])
                 const settled = progress.total > 0 && progress.pending === 0
                 return (
-                  <div className="history-item" key={t.id}>
+                  <div className="history-item" key={table.id}>
                     <div className="history-head">
-                      <span className="history-date">{fmtDate(t.finished_at || t.created_at)}</span>
+                      <span className="history-date">{fmtDate(table.finished_at || table.created_at)}</span>
                       <span className="history-buyin">
-                        {t.name ? `${t.name} · ` : ''}cacife {fmt(t.buy_in)}
+                        {table.name ? `${table.name} · ` : ''}{fmt(table.buy_in)}
                       </span>
-                      <button className="history-del" title="Apagar mesa" onClick={() => setDeleting(t)}>✕</button>
+                      <button
+                        className="history-del"
+                        title={t('tables.deleteTable')}
+                        onClick={() => setDeleting(table)}
+                      >✕</button>
                     </div>
 
-                    <button className="history-open" onClick={() => navigate(`/mesa/${t.id}/acerto`)}>
+                    <button className="history-open" onClick={() => navigate(`/mesa/${table.id}/acerto`)}>
                       <span className={`pay-pill${settled ? ' done' : ''}`}>
                         {progress.total === 0
-                          ? 'Sem acerto'
+                          ? t('tables.noSettlement')
                           : settled
-                            ? 'Tudo pago'
-                            : `${progress.pending} pendente${progress.pending > 1 ? 's' : ''} · ${fmt(progress.pendingAmount)}`}
+                            ? t('tables.allPaid')
+                            : t(progress.pending > 1 ? 'tables.pendingAmountPlural' : 'tables.pendingAmount', {
+                                count: progress.pending,
+                                amount: fmt(progress.pendingAmount),
+                              })}
                       </span>
-                      <span className="history-open-cta">Ver acerto →</span>
+                      <span className="history-open-cta">{t('tables.seeSettlement')}</span>
                     </button>
                   </div>
                 )
@@ -126,8 +126,6 @@ export default function TablesScreen() {
           </div>
         </div>
       </div>
-
-      <ThemeModal open={themeOpen} theme={theme} onSelect={setTheme} onClose={() => setThemeOpen(false)} />
 
       <DeleteTableModal
         table={deleting}

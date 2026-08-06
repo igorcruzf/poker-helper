@@ -881,7 +881,7 @@ h1 .suit.red{ color: var(--red-bright); }
    Login / criação de conta
    =========================================================================== */
 .auth-app{ justify-content:center; min-height: 100vh; }
-.auth-titles{ margin: 8vh 0 18px; }
+.auth-titles{ margin: 6vh 0 18px; }
 .auth-card{ padding: 20px 18px 14px; }
 .auth-lead{
   font-family:'Fraunces', serif; font-size: 17px; font-weight:600;
@@ -1431,3 +1431,69 @@ h1 .suit.red{ color: var(--red-bright); }
 }
 .share-actions .timer-btn{ width:100%; }
 .share-actions .timer-btn + .timer-btn{ margin-top: 8px; }
+
+.lang-flag{
+  width: 26px; height: 26px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size: 17px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: rgba(0,0,0,0.25);
+}
+/* A tela de login usa o cabecalho normal, sem o respiro extra do titulo antigo. */
+.auth-app .card{ margin-top: 18px; }
+
+/* ===========================================================================
+   Valores da mesa (só leitura: definidos na criação)
+   =========================================================================== */
+.buyin-static{
+  font-family:'IBM Plex Mono', monospace;
+  font-size: 15px; font-weight:600; color: var(--gold-bright);
+  white-space:nowrap;
+}
+/* Entrada e rebuy: mesmo peso, distinguidos pela legenda. Segue a tipografia
+   dos tiles de estatísticas para não inventar um terceiro estilo de número. */
+.buyin-split{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px dashed var(--line);
+}
+.buyin-cell{
+  display:flex; flex-direction:column; gap: 3px;
+  min-width:0;
+}
+.buyin-cell + .buyin-cell{
+  padding-left: 16px;
+  border-left: 1px solid var(--line);
+}
+.buyin-cell-label{
+  font-family:'IBM Plex Mono', monospace;
+  font-size: 9.5px; letter-spacing: 0.14em; text-transform:uppercase;
+  color: var(--cream-dim);
+}
+.buyin-cell-value{
+  font-family:'IBM Plex Mono', monospace;
+  font-size: 17px; font-weight:700; color: var(--gold-bright);
+  white-space:nowrap;
+}
+
+/* Dica sob um campo de formulário */
+.field-hint{
+  display:block; margin-top: 5px;
+  font-size: 11.5px; line-height:1.4; color: var(--cream-dim);
+}
+
+/* Alertas: botão de teste e notas de vibração */
+.alert-test{
+  border-color: var(--gold-bright);
+  color: var(--gold-bright);
+  font-family:'Inter', sans-serif; font-size: 12.5px; font-weight:600;
+}
+.alert-note{
+  font-size: 11.5px; line-height:1.45;
+  color: var(--cream-dim);
+  text-align:center;
+  margin: 8px 4px 0;
+}

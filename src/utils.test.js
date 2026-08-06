@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fmt, saldoClass, computeSaldo, parseMoney, fmtDate } from './utils'
+import { fmt, saldoClass, computeSaldo, cacifesCost, parseMoney, fmtDate } from './utils'
 
 describe('fmt', () => {
   it('formats positive values with comma decimal', () => {
@@ -61,5 +61,39 @@ describe('fmtDate', () => {
     // 'Invalid Date' rather than throwing, so fmtDate's try/catch never
     // actually triggers here — this just locks in that it doesn't crash.
     expect(fmtDate(undefined)).toBe('Invalid Date')
+  })
+})
+
+describe('cacifesCost', () => {
+  it('cobra o valor de entrada no primeiro cacife e o rebuy nos seguintes', () => {
+    // entrada R$ 10, rebuy R$ 5: 1 cacife = 10, 2 = 15, 3 = 20
+    expect(cacifesCost(1, 10, 5)).toBe(10)
+    expect(cacifesCost(2, 10, 5)).toBe(15)
+    expect(cacifesCost(3, 10, 5)).toBe(20)
+  })
+
+  it('cobra tudo igual quando não há rebuy próprio', () => {
+    expect(cacifesCost(3, 10)).toBe(30)
+    expect(cacifesCost(3, 10, null)).toBe(30)
+    expect(cacifesCost(3, 10, undefined)).toBe(30)
+  })
+
+  it('não cobra nada de quem está com zero cacifes', () => {
+    expect(cacifesCost(0, 10, 5)).toBe(0)
+  })
+
+  it('aceita rebuy mais caro que a entrada', () => {
+    expect(cacifesCost(3, 5, 20)).toBe(45)
+  })
+})
+
+describe('computeSaldo com rebuy', () => {
+  it('desconta entrada + rebuys do valor levado da mesa', () => {
+    // 3 cacifes (10 + 5 + 5 = 20), levou 50 → saldo 30
+    expect(computeSaldo({ cacifes: 3, adjustment: 50 }, 10, 5)).toBe(30)
+  })
+
+  it('mantém o cálculo antigo sem rebuy informado', () => {
+    expect(computeSaldo({ cacifes: 2, adjustment: 0 }, 5)).toBe(-10)
   })
 })

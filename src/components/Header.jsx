@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useI18n } from '../hooks/useI18n.js'
 
 export default function Header({
   onOpenRanking,
@@ -6,6 +7,7 @@ export default function Header({
   onOpenHome,
   onOpenStats,
   onOpenThemes,
+  onOpenLanguage,
   onLogout,
   userEmail,
   canInstall,
@@ -13,6 +15,7 @@ export default function Header({
   subtitle,
   onShare,
 }) {
+  const { t } = useI18n()
   const [menuOpen, setMenuOpen] = useState(false)
   const panelRef = useRef(null)
 
@@ -37,31 +40,32 @@ export default function Header({
   // acerto aberto por link (sem conta) e com o "Instalar app" no lugar certo.
   const sections = [
     {
-      label: 'mesa',
+      label: t('menu.table'),
       items: [
-        onOpenTables && { icon: '🃏', label: 'Minhas mesas', action: onOpenTables },
-        onOpenHome && { icon: '🏠', label: 'Início do app', action: onOpenHome },
+        onOpenTables && { icon: '🃏', label: t('menu.myTables'), action: onOpenTables },
+        onOpenHome && { icon: '🏠', label: t('menu.home'), action: onOpenHome },
       ],
     },
     {
-      label: 'referência',
-      items: [onOpenRanking && { icon: '🂡', label: 'Ranking das mãos', action: onOpenRanking }],
+      label: t('menu.reference'),
+      items: [onOpenRanking && { icon: '🂡', label: t('menu.handRanking'), action: onOpenRanking }],
     },
     {
-      label: 'dados',
-      items: [onOpenStats && { icon: '📊', label: 'Estatísticas', action: onOpenStats }],
+      label: t('menu.data'),
+      items: [onOpenStats && { icon: '📊', label: t('menu.stats'), action: onOpenStats }],
     },
     {
-      label: 'app',
+      label: t('menu.app'),
       items: [
-        onOpenThemes && { icon: '🎨', label: 'Temas', action: onOpenThemes },
-        canInstall && { icon: '📲', label: 'Instalar app', action: onInstall },
+        onOpenThemes && { icon: '🎨', label: t('menu.themes'), action: onOpenThemes },
+        onOpenLanguage && { icon: '🌐', label: t('menu.language'), action: onOpenLanguage },
+        canInstall && { icon: '📲', label: t('menu.install'), action: onInstall },
       ],
     },
     {
-      label: 'conta',
+      label: t('menu.account'),
       caption: userEmail,
-      items: [onLogout && { icon: '🚪', label: 'Sair', action: onLogout, danger: true }],
+      items: [onLogout && { icon: '🚪', label: t('menu.logout'), action: onLogout, danger: true }],
     },
   ]
     .map((s) => ({ ...s, items: s.items.filter(Boolean) }))
@@ -70,7 +74,7 @@ export default function Header({
   return (
     <>
       <div className="top-bar">
-        <button className="hamburger-btn" onClick={() => setMenuOpen(true)} title="Menu">
+        <button className="hamburger-btn" onClick={() => setMenuOpen(true)} title={t('menu.menu')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <line x1="3" y1="6" x2="21" y2="6" />
             <line x1="3" y1="12" x2="21" y2="12" />
@@ -78,11 +82,11 @@ export default function Header({
           </svg>
         </button>
         <div className="header-titles">
-          <div className="eyebrow">{subtitle || 'Mesa de Poker'}</div>
+          <div className="eyebrow">{subtitle || t('eyebrow.table')}</div>
           <h1><span className="suit gold">♠</span>Cacifes<span className="suit red">♥</span></h1>
         </div>
         {onShare ? (
-          <button className="hamburger-btn" onClick={onShare} title="Compartilhar a mesa">
+          <button className="hamburger-btn" onClick={onShare} title={t('menu.share')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="18" cy="5" r="3" />
               <circle cx="6" cy="12" r="3" />

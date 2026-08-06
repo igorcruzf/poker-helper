@@ -2,10 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { computeSaldo, fmt, saldoClass } from '../utils.js'
-import Header from '../components/Header.jsx'
-import ThemeModal from '../components/ThemeModal.jsx'
-import { useTheme } from '../hooks/useTheme.js'
-import { useInstallPrompt } from '../hooks/useInstallPrompt.js'
+import AppChrome from '../components/AppChrome.jsx'
+import BuyInRow from '../components/BuyInRow.jsx'
+import { useI18n } from '../hooks/useI18n.js'
 
 const POLL_MS = 10000
 
@@ -22,9 +21,7 @@ function remainingSeconds(timer) {
 export default function SharedTableScreen() {
   const { token } = useParams()
   const navigate = useNavigate()
-  const [theme, setTheme] = useTheme()
-  const { canInstall, promptInstall } = useInstallPrompt()
-  const [themeOpen, setThemeOpen] = useState(false)
+  const { t } = useI18n()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
@@ -57,14 +54,14 @@ export default function SharedTableScreen() {
 
   // Faz o relógio andar entre uma sincronização e outra.
   useEffect(() => {
-    const id = setInterval(() => forceTick((t) => t + 1), 1000)
+    const id = setInterval(() => forceTick((n) => n + 1), 1000)
     return () => clearInterval(id)
   }, [])
 
   if (loading) {
     return (
       <div className="app-shell">
-        <div className="app"><div className="empty-state">Carregando mesa…</div></div>
+        <div className="app"><div className="empty-state">{t('live.loading')}</div></div>
       </div>
     )
   }
@@ -74,12 +71,12 @@ export default function SharedTableScreen() {
       <div className="app-shell">
         <div className="app">
           <div className="header-titles auth-titles">
-            <div className="eyebrow">Mesa de Poker</div>
+            <div className="eyebrow">{t('eyebrow.table')}</div>
             <h1><span className="suit gold">♠</span>Cacifes<span className="suit red">♥</span></h1>
           </div>
           <div className="card">
             <div className="empty-state">
-              Link inválido ou expirado.<br />Peça um novo para quem organizou a mesa.
+              {t('settle.invalidLink')}<br />{t('settle.invalidLinkHint')}
             </div>
           </div>
         </div>
@@ -89,12 +86,15 @@ export default function SharedTableScreen() {
 
   const table = data.table
   const buyIn = Number(table.buy_in)
+  const rebuy = table.rebuy_value === null || table.rebuy_value === undefined
+    ? buyIn
+    : Number(table.rebuy_value)
   const players = (data.players || []).map((p) => ({
     ...p,
     cacifes: Number(p.cacifes),
     adjustment: Number(p.adjustment),
   }))
-  const total = players.reduce((acc, p) => acc + computeSaldo(p, buyIn), 0)
+  const total = players.reduce((acc, p) => acc + computeSaldo(p, buyIn, rebuy), 0)
   const timer = table.timer_state
   const secondsLeft = remainingSeconds(timer)
   const smallBlind = timer ? timer.baseBlind * Math.pow(2, timer.level) : 0
@@ -102,24 +102,21 @@ export default function SharedTableScreen() {
   return (
     <div className="app-shell">
       <div className="app">
-        <Header
+        <AppChrome
           onOpenHome={() => navigate('/')}
           onOpenRanking={() => navigate('/ranking')}
-          onOpenThemes={() => setThemeOpen(true)}
-          canInstall={canInstall}
-          onInstall={promptInstall}
-          subtitle={table.name || 'Mesa ao vivo'}
+          subtitle={table.name || t('eyebrow.live')}
         />
 
         {table.status === 'finished' ? (
           <button className="active-table-card" onClick={() => navigate(`/acerto/${token}`)}>
-            <span className="active-table-flag">Mesa encerrada</span>
-            <span className="active-table-name">O acerto já saiu</span>
-            <span className="active-table-cta">Ver quem paga quem →</span>
+            <span className="active-table-flag">{t('live.finished')}</span>
+            <span className="active-table-name">{t('live.finishedName')}</span>
+            <span className="active-table-cta">{t('live.finishedCta')}</span>
           </button>
         ) : (
           <div className="live-flag">
-            <span className="live-dot" /> Ao vivo · atualiza sozinho
+            <span className="live-dot" /> {t('live.flag')}
           </div>
         )}
 
@@ -130,32 +127,26 @@ export default function SharedTableScreen() {
               {String(secondsLeft % 60).padStart(2, '0')}
             </span>
             <span className="timer-bar-info">
-              Nível {timer.level + 1} · {smallBlind}/{smallBlind * 2}
-              {!timer.running && !timer.awaitingConfirm && ' · pausado'}
+              {t('table.level', { level: timer.level + 1, small: smallBlind, big: smallBlind * 2 })}
+              {!timer.running && !timer.awaitingConfirm && t('live.paused')}
             </span>
-            {timer.awaitingConfirm && <span className="timer-bar-flag">⏰ Subiu o blind</span>}
+            {timer.awaitingConfirm && <span className="timer-bar-flag">{t('live.blindUp')}</span>}
           </div>
         )}
 
         <div className="rail">
           <div className="card">
-            <div className="buyin-row">
-              <span className="buyin-label">Valor do cacife</span>
-              <div className="buyin-input-wrap">
-                <span>R$</span>
-                <span className="buyin-static">{buyIn.toFixed(2).replace('.', ',')}</span>
-              </div>
-            </div>
+            <BuyInRow buyIn={buyIn} rebuy={rebuy} />
 
             <div className="col-labels">
-              <span>Nome</span>
-              <span>Cacifes</span>
-              <span>Saldo</span>
+              <span>{t('table.name')}</span>
+              <span>{t('table.cacifes')}</span>
+              <span>{t('table.saldo')}</span>
             </div>
 
             <div className="players">
               {players.map((p) => {
-                const saldo = computeSaldo(p, buyIn)
+                const saldo = computeSaldo(p, buyIn, rebuy)
                 return (
                   <div className="live-row" key={p.id}>
                     <span className="live-name">{p.name}</span>
@@ -166,23 +157,20 @@ export default function SharedTableScreen() {
               })}
             </div>
 
-            {players.length === 0 && <div className="empty-state">Mesa ainda sem jogadores.</div>}
+            {players.length === 0 && <div className="empty-state">{t('live.noPlayers')}</div>}
 
             {players.length > 0 && (
               <div className="total-row">
-                <span>Total da mesa</span>
+                <span>{t('table.total')}</span>
                 <span className={saldoClass(total)}>{fmt(total)}</span>
               </div>
             )}
 
-            <p className="settle-note">
-              Você está vendo a mesa por um link — dá para acompanhar, não para alterar.
-            </p>
+            <p className="settle-note">{t('live.readOnly')}</p>
           </div>
         </div>
       </div>
 
-      <ThemeModal open={themeOpen} theme={theme} onSelect={setTheme} onClose={() => setThemeOpen(false)} />
     </div>
   )
 }

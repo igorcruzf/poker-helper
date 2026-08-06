@@ -8,10 +8,10 @@ import {
   round2,
   settlementFromBalances,
 } from '../lib/settlement.js'
-import { computeSaldo, parseMoney } from '../utils.js'
+import { cacifesCost, computeSaldo } from '../utils.js'
 
 const TABLE_SELECT = `
-  id, name, buy_in, status, settlement_mode, settlement_player_id,
+  id, name, buy_in, rebuy_value, status, settlement_mode, settlement_player_id,
   share_token, allow_guest_payments, created_at, finished_at,
   table_players ( id, player_id, name, cacifes, adjustment, position ),
   settlements ( id, from_table_player_id, to_table_player_id, amount, paid, paid_at )
@@ -149,12 +149,6 @@ export function useTable(tableId) {
     playersRef.current = prev.players
     setPlayers(prev.players)
 
-    if (prev.buyIn !== buyInRef.current) {
-      buyInRef.current = prev.buyIn
-      setTable((t) => (t ? { ...t, buy_in: prev.buyIn } : t))
-      scheduleSave('poker_tables', tableId, { buy_in: prev.buyIn }, 0)
-    }
-
     const prevIds = new Set(prev.players.map((p) => p.id))
     const currentIds = new Set(current.map((p) => p.id))
 
@@ -201,22 +195,6 @@ export function useTable(tableId) {
   }
 
   // --- mutações -----------------------------------------------------------
-
-  function handleBuyInChange(raw) {
-    const v = parseFloat(raw)
-    const next = isNaN(v) ? 0 : v
-    pushUndo()
-    buyInRef.current = next
-    setTable((t) => (t ? { ...t, buy_in: next } : t))
-    scheduleSave('poker_tables', tableId, { buy_in: next }, 700)
-  }
-
-  function handleBuyInBlur(raw) {
-    const v = parseMoney(raw, { min: 0, fallback: 0 })
-    buyInRef.current = v
-    setTable((t) => (t ? { ...t, buy_in: v } : t))
-    scheduleSave('poker_tables', tableId, { buy_in: v }, 0)
-  }
 
   async function addPlayer({ name, playerId } = {}) {
     const id = newId()
@@ -311,6 +289,7 @@ export function useTable(tableId) {
       mode: table.settlement_mode,
       playerId: collectorRowId(),
       balanceMode,
+      rebuy,
     })
   }
 
@@ -319,7 +298,7 @@ export function useTable(tableId) {
     await flushSaves()
 
     const buyInNow = Number(table.buy_in)
-    const balances = balancePlayers(players, buyInNow, balanceMode)
+    const balances = balancePlayers(players, buyInNow, balanceMode, rebuy)
     const { transfers } = settlementFromBalances(balances, {
       mode: table.settlement_mode,
       playerId: collectorRowId(),
@@ -329,8 +308,8 @@ export function useTable(tableId) {
     // ficar gravado, senão o histórico não bate com o acerto.
     const rebalanced = playersRef.current.map((p) => {
       const b = balances.find((x) => x.id === p.id)
-      if (!b || Math.abs(computeSaldo(p, buyInNow) - b.saldo) <= EPS) return p
-      return { ...p, adjustment: round2(b.saldo + p.cacifes * buyInNow) }
+      if (!b || Math.abs(computeSaldo(p, buyInNow, rebuy) - b.saldo) <= EPS) return p
+      return { ...p, adjustment: round2(b.saldo + cacifesCost(p.cacifes, buyInNow, rebuy)) }
     })
     const touched = rebalanced.filter((p, i) => p !== playersRef.current[i])
     if (touched.length > 0) {
@@ -393,20 +372,23 @@ export function useTable(tableId) {
   }
 
   const buyIn = table ? Number(table.buy_in) : 0
-  const total = players.reduce((acc, p) => acc + computeSaldo(p, buyIn), 0)
+  // Nulo no banco significa "rebuy pelo mesmo valor da entrada".
+  const rebuy = table && table.rebuy_value !== null && table.rebuy_value !== undefined
+    ? Number(table.rebuy_value)
+    : buyIn
+  const total = players.reduce((acc, p) => acc + computeSaldo(p, buyIn, rebuy), 0)
 
   return {
     table,
     players,
     settlements,
     buyIn,
+    rebuy,
     total,
     loading,
     error,
     canUndo,
     undo,
-    handleBuyInChange,
-    handleBuyInBlur,
     addPlayer,
     renamePlayer,
     changeCacife,

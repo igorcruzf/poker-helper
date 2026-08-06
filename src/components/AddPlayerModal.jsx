@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useRoster } from '../hooks/useRoster.js'
+import { useI18n } from '../hooks/useI18n.js'
 
 // Entra jogador no meio da noite: pega alguém do elenco ou cria na hora.
 export default function AddPlayerModal({ open, tablePlayers, onCancel, onConfirm }) {
   const { roster, loading, addToRoster } = useRoster()
+  const { t } = useI18n()
   const [newName, setNewName] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -27,12 +29,12 @@ export default function AddPlayerModal({ open, tablePlayers, onCancel, onConfirm
     <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}>
       <div className="modal">
         <button className="close-x" onClick={onCancel}>✕</button>
-        <p className="question">Novo jogador</p>
+        <p className="question">{t('table.addTitle')}</p>
 
-        {loading && <div className="empty-state">Carregando elenco…</div>}
+        {loading && <div className="empty-state">{t('table.addLoading')}</div>}
 
         {!loading && available.length === 0 && (
-          <div className="empty-state">Todo o elenco já está na mesa.</div>
+          <div className="empty-state">{t('table.addAllSeated')}</div>
         )}
 
         <div className="roster-list">
@@ -53,10 +55,10 @@ export default function AddPlayerModal({ open, tablePlayers, onCancel, onConfirm
           <input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="Ou digite um nome novo"
+            placeholder={t('table.addNewName')}
           />
           <button type="submit" className="roster-add-btn" disabled={busy || !newName.trim()}>
-            Adicionar
+            {t('create.add')}
           </button>
         </form>
       </div>

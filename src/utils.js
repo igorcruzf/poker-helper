@@ -1,7 +1,32 @@
+import { getLocale } from './lib/i18n.js'
+
+const DATE_LOCALES = { pt: 'pt-BR', en: 'en-US', es: 'es-ES' }
+
+function dateLocale() {
+  return DATE_LOCALES[getLocale()] || 'pt-BR'
+}
+
+// A moeda acompanha o idioma do host. Formatado na mão em vez de Intl para o
+// resultado ser previsível (Intl usa espaço não-quebrável entre símbolo e valor).
+const CURRENCY = {
+  pt: { symbol: 'R$', after: false, space: true, decimal: ',', group: '.' },
+  en: { symbol: '$', after: false, space: false, decimal: '.', group: ',' },
+  es: { symbol: '€', after: true, space: true, decimal: ',', group: '.' },
+}
+
+export function currency() {
+  return CURRENCY[getLocale()] || CURRENCY.pt
+}
+
 export function fmt(n) {
+  const c = currency()
   const v = Number(n) || 0
   const sign = v < 0 ? '-' : ''
-  return 'R$ ' + sign + Math.abs(v).toFixed(2).replace('.', ',')
+  const [whole, cents] = Math.abs(v).toFixed(2).split('.')
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, c.group)
+  const number = sign + grouped + c.decimal + cents
+  const gap = c.space ? ' ' : ''
+  return c.after ? number + gap + c.symbol : c.symbol + gap + number
 }
 
 export function saldoClass(n) {
@@ -10,9 +35,18 @@ export function saldoClass(n) {
   return 'zero'
 }
 
+// O primeiro cacife custa o valor de entrada; os seguintes custam o rebuy, que
+// pode ser diferente. Sem rebuy definido, todos valem o mesmo.
+export function cacifesCost(cacifes, buyIn, rebuy) {
+  const count = Number(cacifes) || 0
+  if (count <= 0) return 0
+  const extra = rebuy === null || rebuy === undefined ? buyIn : rebuy
+  return buyIn + (count - 1) * extra
+}
+
 // Derived balance: manual cash-out adjustments minus what's owed for buy-ins taken
-export function computeSaldo(player, buyIn) {
-  return (player.adjustment || 0) - player.cacifes * buyIn
+export function computeSaldo(player, buyIn, rebuy) {
+  return (player.adjustment || 0) - cacifesCost(player.cacifes, buyIn, rebuy)
 }
 
 export function parseMoney(raw, options) {
@@ -46,9 +80,11 @@ export function playBeep({ frequency = 660, duration = 0.5, volume = 0.9, type =
   }
 }
 
+// Formato de data segue o idioma; o dinheiro nao, porque a mesa e em reais
+// independente da lingua de quem olha.
 export function fmtDate(ts) {
   try {
-    return new Date(ts).toLocaleDateString('pt-BR', {
+    return new Date(ts).toLocaleDateString(dateLocale(), {
       day: '2-digit', month: '2-digit', year: 'numeric',
     })
   } catch {

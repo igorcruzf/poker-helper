@@ -4,7 +4,7 @@ import { balancePlayers, settlementFromBalances } from './settlement.js'
 // Texto que vai para o grupo. No meio do jogo sai só a parte de saldos; ao
 // encerrar, sai também quem paga quem.
 export function buildSummaryText(players, buyIn, options = {}) {
-  const balances = balancePlayers(players, buyIn, options.balanceMode)
+  const balances = balancePlayers(players, buyIn, options.balanceMode, options.rebuy)
   const lines = [`Cacifes — ${fmt(buyIn)} por cacife`, '']
 
   if (balances.length === 0) {
