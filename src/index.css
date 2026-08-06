@@ -51,6 +51,37 @@
   --red-bright:#E0836B;
   --line: rgba(243,231,211,0.15);
 }
+[data-theme="pride"]{
+  --felt-dark:#160828;
+  --felt:#2E0B57;
+  --felt-light:#4C1D95;
+  --cream:#FDF4FF;
+  --cream-dim:#D8B4FE;
+  --gold:#EC4899;
+  --gold-bright:#FACC15;
+  --red:#DC2626;
+  --red-bright:#FB7185;
+  --line: rgba(253,244,255,0.16);
+  --pride-arc: linear-gradient(90deg,#E40303,#FF8C00,#FFED00,#008026,#24408E,#732982);
+  --pride-glow:
+    0 0 5px rgba(228,3,3,0.45),
+    0 0 12px rgba(255,140,0,0.35),
+    0 0 20px rgba(0,128,38,0.30),
+    0 0 30px rgba(36,64,142,0.38),
+    0 0 42px rgba(115,41,130,0.38);
+  --pride-glow-strong:
+    0 0 6px rgba(228,3,3,0.65),
+    0 0 16px rgba(255,140,0,0.5),
+    0 0 26px rgba(0,128,38,0.42),
+    0 0 38px rgba(36,64,142,0.5),
+    0 0 54px rgba(115,41,130,0.5);
+  --pride-glow-soft:
+    0 0 4px rgba(228,3,3,0.35),
+    0 0 9px rgba(255,140,0,0.28),
+    0 0 15px rgba(0,128,38,0.24),
+    0 0 21px rgba(36,64,142,0.30),
+    0 0 29px rgba(115,41,130,0.30);
+}
 *{ box-sizing:border-box; }
 html,body,#root{ margin:0; padding:0; }
 body{
@@ -661,6 +692,11 @@ h1 .suit.red{ color: var(--red-bright); }
 .theme-swatch-midnight{ background: linear-gradient(135deg,#16233B,#05070A); }
 .theme-swatch-classic{ background: linear-gradient(135deg,#9E2B2B,#4A1414); }
 .theme-swatch-wood{ background: linear-gradient(135deg,#5A3A22,#241407); }
+.theme-swatch-pride{
+  background: linear-gradient(180deg,
+    #E40303 0 16.667%, #FF8C00 16.667% 33.333%, #FFED00 33.333% 50%,
+    #008026 50% 66.667%, #24408E 66.667% 83.333%, #732982 83.333% 100%);
+}
 
 /* History modal */
 .history-list{ display:flex; flex-direction:column; gap: 10px; max-height: 60vh; overflow-y:auto; }
@@ -775,3 +811,65 @@ h1 .suit.red{ color: var(--red-bright); }
   cursor: pointer;
 }
 .copy-toggle input{ width: 16px; height: 16px; accent-color: var(--gold-bright); }
+
+/* Pride theme: thin rainbow edge on chips/buttons, faces stay minimalist */
+[data-theme="pride"] .chip-btn:not(.remove),
+[data-theme="pride"] .ranking-rank{
+  border: 1.5px solid transparent;
+  background:
+    radial-gradient(circle at 50% 50%, var(--felt-dark) 54%, transparent 55%) padding-box,
+    repeating-conic-gradient(var(--gold-bright) 0deg 11deg, var(--felt-dark) 11deg 22deg) padding-box,
+    var(--pride-arc) border-box;
+}
+/* Painéis flutuantes: o violeta do fundo é claro demais para servir de modal */
+[data-theme="pride"] .modal,
+[data-theme="pride"] .menu-panel{
+  background: linear-gradient(180deg, #3A1670, #230A46);
+}
+[data-theme="pride"] .theme-option.active{
+  border-color: rgba(253,244,255,0.45);
+  box-shadow: var(--pride-glow-soft);
+}
+[data-theme="pride"] .hamburger-btn{
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(180deg, rgba(253,244,255,0.14), rgba(253,244,255,0.04)) padding-box,
+    linear-gradient(var(--felt-dark), var(--felt-dark)) padding-box,
+    var(--pride-arc) border-box;
+  box-shadow: var(--pride-glow);
+}
+[data-theme="pride"] .add-player-btn{
+  border: 2px solid transparent;
+  background:
+    linear-gradient(180deg, rgba(250,204,21,0.16), rgba(115,41,130,0.45)) padding-box,
+    linear-gradient(var(--felt-dark), var(--felt-dark)) padding-box,
+    var(--pride-arc) border-box;
+  background-size: auto, auto, 300% 100%;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4), var(--pride-glow);
+  transition: transform 0.12s ease, box-shadow 0.2s ease;
+  animation: pride-sweep 9s ease-in-out infinite alternate;
+}
+[data-theme="pride"] .add-player-btn:hover{
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4), var(--pride-glow-strong);
+}
+[data-theme="pride"] .timer-bar:not(.alert){
+  border: 2px solid transparent;
+  background:
+    linear-gradient(180deg, rgba(253,244,255,0.10), rgba(115,41,130,0.32)) padding-box,
+    linear-gradient(var(--felt-dark), var(--felt-dark)) padding-box,
+    var(--pride-arc) border-box;
+  background-size: auto, auto, 300% 100%;
+  box-shadow: var(--pride-glow);
+  animation: pride-sweep 9s ease-in-out infinite alternate;
+}
+[data-theme="pride"] .timer-btn{
+  box-shadow: var(--pride-glow);
+}
+@keyframes pride-sweep{
+  from{ background-position: 0 0, 0 0, 0% 50%; }
+  to{ background-position: 0 0, 0 0, 100% 50%; }
+}
+@media (prefers-reduced-motion: reduce){
+  [data-theme="pride"] .add-player-btn,
+  [data-theme="pride"] .timer-bar:not(.alert){ animation: none !important; }
+}

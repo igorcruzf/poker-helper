@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 
-export default function Header({ onOpenRanking, onOpenReset, onOpenTimer, onOpenHistory, onOpenStats, onOpenThemes, onEndNight, canInstall, onInstall }) {
+export default function Header({ onOpenRanking, onOpenReset, onOpenTimer, onOpenTimeBank, onOpenHistory, onOpenStats, onOpenThemes, onEndNight, canInstall, onInstall }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const panelRef = useRef(null)
 
@@ -46,6 +46,12 @@ export default function Header({ onOpenRanking, onOpenReset, onOpenTimer, onOpen
               onClick={() => { setMenuOpen(false); onOpenTimer() }}
             >
               <span className="icon">⏱️</span> Timer de blinds
+            </button>
+            <button
+              className="menu-item"
+              onClick={() => { setMenuOpen(false); onOpenTimeBank() }}
+            >
+              <span className="icon">⏳</span> Time bank
             </button>
             <button
               className="menu-item"

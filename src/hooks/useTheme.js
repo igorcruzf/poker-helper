@@ -5,6 +5,7 @@ export const THEMES = [
   { id: 'midnight', name: 'Meia-noite' },
   { id: 'classic', name: 'Clássico vermelho' },
   { id: 'wood', name: 'Madeira' },
+  { id: 'pride', name: 'Orgulho' },
 ]
 
 export function useTheme() {

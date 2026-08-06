@@ -1,24 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-
-function playBeep() {
-  try {
-	const ctx = new (window.AudioContext || window.webkitAudioContext)()
-	const osc = ctx.createOscillator()
-	const gain = ctx.createGain()
-	osc.connect(gain)
-	gain.connect(ctx.destination)
-	osc.type = 'sine'
-	osc.frequency.value = 330
-	gain.gain.setValueAtTime(0.0001, ctx.currentTime)
-	gain.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + 0.03)
-	gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5)
-	osc.start()
-	osc.stop(ctx.currentTime + 0.55)
-	setTimeout(() => ctx.close(), 650)
-  } catch {
-	/* ignore */
-  }
-}
+import { playBeep } from '../utils.js'
 
 export function useBlindsTimer() {
   const [minutes, setMinutes] = useState(10)

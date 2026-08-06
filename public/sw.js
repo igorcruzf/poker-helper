@@ -1,4 +1,4 @@
-const CACHE = 'poker-cacifes-v1'
+const CACHE = 'poker-cacifes-v2'
 const CORE = ['.', 'index.html', 'manifest.webmanifest', 'icon.svg']
 
 self.addEventListener('install', (event) => {

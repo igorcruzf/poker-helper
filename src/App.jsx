@@ -1,10 +1,14 @@
 import { useState } from 'react'
 import { useLocalStorage } from './hooks/useLocalStorage.js'
 import { useInstallPrompt } from './hooks/useInstallPrompt.js'
-import { useUndoableLocalStorage } from './hooks/useUndoableLocalStorage.js'
 import { useTheme } from './hooks/useTheme.js'
 import { useBlindsTimer } from './hooks/useBlindsTimer.js'
-import { computeSaldo, parseMoney } from './utils.js'
+import { useTimeBank } from './hooks/useTimeBank.js'
+import { usePlayers } from './hooks/usePlayers.js'
+import { useHistory } from './hooks/useHistory.js'
+import { useModals } from './hooks/useModals.js'
+import { useSortedPlayers } from './hooks/useSortedPlayers.js'
+import { useDragReorder } from './hooks/useDragReorder.js'
 
 import Header from './components/Header.jsx'
 import BuyInRow from './components/BuyInRow.jsx'
@@ -19,131 +23,54 @@ import ThemeModal from './components/ThemeModal.jsx'
 import HistoryModal from './components/HistoryModal.jsx'
 import StatsModal from './components/StatsModal.jsx'
 import BlindsTimerModal from './components/BlindsTimer.jsx'
+import TimeBankModal from './components/TimeBankModal.jsx'
 import EndGameModal from './components/EndGameModal.jsx'
 
-const DEFAULT_BUYIN = 5.0
-
-function uid() {
-  return 'p_' + Math.random().toString(36).slice(2, 9)
-}
-
 export default function App() {
-  const [state, setState, undo, canUndo] = useUndoableLocalStorage('poker-dos-meninos-v1', {
-    buyIn: DEFAULT_BUYIN,
-    players: [],
-  })
-  const [history, setHistory] = useLocalStorage('poker-dos-meninos-history-v1', [])
+  const { history, addNight, deleteNight, clearHistory } = useHistory()
+  const {
+    buyIn,
+    players,
+    total,
+    handleBuyInChange,
+    handleBuyInBlur,
+    addPlayer: addPlayerToState,
+    renamePlayer,
+    changeCacife,
+    deletePlayer,
+    adjustPlayer,
+    reorderPlayers,
+    endGame,
+    resetFull: resetFullState,
+    resetKeepPlayers: resetKeepPlayersState,
+    undo,
+    canUndo,
+  } = usePlayers(addNight)
   const [theme, setTheme] = useTheme()
   const [copyEndsGame, setCopyEndsGame] = useLocalStorage('poker-copy-ends-game', true)
   const timer = useBlindsTimer()
+  const timeBank = useTimeBank()
   const { canInstall, promptInstall } = useInstallPrompt()
   const [view, setView] = useState('home') // 'home' | 'ranking'
-  const [deletingPlayer, setDeletingPlayer] = useState(null)
-  const [adjustingPlayer, setAdjustingPlayer] = useState(null)
-  const [exportOpen, setExportOpen] = useState(false)
-  const [resetOpen, setResetOpen] = useState(false)
-  const [themeOpen, setThemeOpen] = useState(false)
-  const [historyOpen, setHistoryOpen] = useState(false)
-  const [statsOpen, setStatsOpen] = useState(false)
-  const [timerOpen, setTimerOpen] = useState(false)
-  const [endGameOpen, setEndGameOpen] = useState(false)
+  const {
+    deletingPlayer, setDeletingPlayer,
+    adjustingPlayer, setAdjustingPlayer,
+    exportOpen, setExportOpen,
+    resetOpen, setResetOpen,
+    themeOpen, setThemeOpen,
+    historyOpen, setHistoryOpen,
+    statsOpen, setStatsOpen,
+    timerOpen, setTimerOpen,
+    timeBankOpen, setTimeBankOpen,
+    endGameOpen, setEndGameOpen,
+  } = useModals()
   const [newPlayerId, setNewPlayerId] = useState(null)
-  const [sort, setSort] = useState({ key: null, dir: 'asc' })
-  const [dragId, setDragId] = useState(null)
+  const { sort, sortedPlayers, toggleSort, sortArrow, dragEnabled } = useSortedPlayers(players, buyIn)
+  const { dragId, handleDragStart, handleDragOver, handleDrop, handleDragEnd } = useDragReorder(reorderPlayers)
 
-  const buyIn = state.buyIn
-  const players = state.players
-
-  function toggleSort(key) {
-    setSort((s) =>
-      s.key === key
-        ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' }
-        : { key, dir: 'desc' }
-    )
-  }
-
-  const sortedPlayers = (() => {
-    if (!sort.key) return players
-    const factor = sort.dir === 'asc' ? 1 : -1
-    return [...players].sort((a, b) => {
-      let av, bv
-      if (sort.key === 'nome') {
-        return factor * a.name.localeCompare(b.name, 'pt', { sensitivity: 'base' })
-      } else if (sort.key === 'cacifes') {
-        av = a.cacifes
-        bv = b.cacifes
-      } else {
-        av = computeSaldo(a, buyIn)
-        bv = computeSaldo(b, buyIn)
-      }
-      return factor * (av - bv)
-    })
-  })()
-
-  function sortArrow(key) {
-    if (sort.key !== key) return ''
-    return sort.dir === 'asc' ? ' ▲' : ' ▼'
-  }
-
-  function handleBuyInChange(raw) {
-    const v = parseFloat(raw)
-    setState((s) => ({ ...s, buyIn: isNaN(v) ? 0 : v }))
-  }
-
-  function handleBuyInBlur(raw) {
-    const v = parseMoney(raw, { min: 0, fallback: 0 })
-    setState((s) => ({ ...s, buyIn: v }))
-  }
-
-  // Drag-and-drop: só habilitado quando não há ordenação por coluna
-  const dragEnabled = !sort.key
-
-  function handleDragStart(e, id) {
-    setDragId(id)
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  function handleDragOver(e) {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-  }
-
-  function handleDrop(e, targetId) {
-    e.preventDefault()
-    if (!dragId || dragId === targetId) return
-    setState((s) => {
-      const list = [...s.players]
-      const from = list.findIndex((p) => p.id === dragId)
-      const to = list.findIndex((p) => p.id === targetId)
-      if (from === -1 || to === -1) return s
-      const [moved] = list.splice(from, 1)
-      list.splice(to, 0, moved)
-      return { ...s, players: list }
-    })
-    setDragId(null)
-  }
-
-  function handleDragEnd() {
-    setDragId(null)
-  }
-
-  function endGame() {
-    if (players.length === 0) return
-    const snapshot = {
-      id: 'n_' + Date.now(),
-      date: Date.now(),
-      buyIn,
-      players: players.map((p) => ({
-        name: p.name,
-        cacifes: p.cacifes,
-        saldo: computeSaldo(p, buyIn),
-      })),
-    }
-    setHistory((h) => [...h, snapshot])
-    setState((s) => ({
-      ...s,
-      players: s.players.map((p) => ({ ...p, cacifes: 1, adjustment: 0 })),
-    }))
+  function addPlayer() {
+    const id = addPlayerToState()
+    setNewPlayerId(id)
   }
 
   function confirmEndGame() {
@@ -151,69 +78,25 @@ export default function App() {
     setEndGameOpen(false)
   }
 
-  function deleteNight(id) {
-    setHistory((h) => h.filter((n) => n.id !== id))
-  }
-
-  function clearHistory() {
-    setHistory([])
-  }
-
-  function addPlayer() {
-      const id = uid()
-      const name = 'Jogador ' + (players.length + 1)
-      setState((s) => ({
-        ...s,
-        players: [...s.players, { id, name, cacifes: 1, adjustment: 0 }],
-      }))
-      setNewPlayerId(id)
-   }
-
-  function renamePlayer(id, name) {
-    setState((s) => ({
-      ...s,
-      players: s.players.map((p) => (p.id === id ? { ...p, name } : p)),
-    }))
-  }
-
-  function changeCacife(id, delta) {
-    setState((s) => ({
-      ...s,
-      players: s.players.map((p) =>
-        p.id === id ? { ...p, cacifes: Math.max(0, p.cacifes + delta) } : p
-      ),
-    }))
-  }
-
   function confirmDelete(player) {
-    setState((s) => ({ ...s, players: s.players.filter((p) => p.id !== player.id) }))
+    deletePlayer(player.id)
     setDeletingPlayer(null)
   }
 
   function confirmAdjust(id, delta) {
-    setState((s) => ({
-      ...s,
-      players: s.players.map((p) =>
-        p.id === id ? { ...p, adjustment: (p.adjustment || 0) + delta } : p
-      ),
-    }))
+    adjustPlayer(id, delta)
     setAdjustingPlayer(null)
   }
 
   function resetFull() {
-    setState({ buyIn: DEFAULT_BUYIN, players: [] })
+    resetFullState()
     setResetOpen(false)
   }
 
   function resetKeepPlayers() {
-    setState((s) => ({
-      ...s,
-      players: s.players.map((p) => ({ ...p, cacifes: 1, adjustment: 0 })),
-    }))
+    resetKeepPlayersState()
     setResetOpen(false)
   }
-
-  const total = players.reduce((acc, p) => acc + computeSaldo(p, buyIn), 0)
 
   return (
     <div className="app-shell">
@@ -222,6 +105,7 @@ export default function App() {
           onOpenRanking={() => setView('ranking')}
           onOpenReset={() => setResetOpen(true)}
           onOpenTimer={() => setTimerOpen(true)}
+          onOpenTimeBank={() => setTimeBankOpen(true)}
           onOpenHistory={() => setHistoryOpen(true)}
           onOpenStats={() => setStatsOpen(true)}
           onOpenThemes={() => setThemeOpen(true)}
@@ -244,6 +128,18 @@ export default function App() {
               Nível {timer.level + 1} · {timer.smallBlind}/{timer.bigBlind}
             </span>
             {timer.awaitingConfirm && <span className="timer-bar-flag">⏰ Confirmar</span>}
+          </button>
+        )}
+
+        {(timeBank.running || timeBank.done) && (
+          <button
+            className={`timer-bar${timeBank.done ? ' alert' : ''}`}
+            onClick={() => setTimeBankOpen(true)}
+            title="Abrir time bank"
+          >
+            <span className="timer-bar-time">{String(timeBank.secondsLeft).padStart(2, '0')}</span>
+            <span className="timer-bar-info">Time bank</span>
+            {timeBank.done && <span className="timer-bar-flag">⏰ Esgotado</span>}
           </button>
         )}
 
@@ -388,6 +284,12 @@ export default function App() {
         open={timerOpen}
         timer={timer}
         onClose={() => setTimerOpen(false)}
+      />
+
+      <TimeBankModal
+        open={timeBankOpen}
+        timeBank={timeBank}
+        onClose={() => setTimeBankOpen(false)}
       />
 
       <EndGameModal
