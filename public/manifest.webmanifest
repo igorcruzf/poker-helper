@@ -1,0 +1,19 @@
+{
+  "name": "Poker dos Meninos — Cacifes",
+  "short_name": "Cacifes",
+  "description": "Controle de cacifes e saldos para a noite de poker.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0E211B",
+  "theme_color": "#0E211B",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -10,6 +10,12 @@ export default function PlayerRow({
   onOpenAdjust,
   autoFocus,
   onFocused,
+  dragEnabled,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  isDragging,
 }) {
   const saldo = computeSaldo(player, buyIn)
   const [bump, setBump] = useState(false)
@@ -37,7 +43,14 @@ export default function PlayerRow({
   }, [])
 
   return (
-    <div className="player-row">
+    <div
+      className={`player-row${isDragging ? ' dragging' : ''}`}
+      draggable={dragEnabled}
+      onDragStart={dragEnabled ? (e) => onDragStart(e, player.id) : undefined}
+      onDragOver={dragEnabled ? (e) => onDragOver(e, player.id) : undefined}
+      onDrop={dragEnabled ? (e) => onDrop(e, player.id) : undefined}
+      onDragEnd={dragEnabled ? onDragEnd : undefined}
+    >
       <div className="chip-btn remove" onClick={() => onDelete(player)}>−</div>
       <input
         ref={nameInputRef}

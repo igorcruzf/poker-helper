@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 
-export default function Header({ onOpenRanking, onOpenReset }) {
+export default function Header({ onOpenRanking, onOpenReset, onOpenTimer, onOpenHistory, onOpenStats, onOpenThemes, onEndNight, canInstall, onInstall }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const panelRef = useRef(null)
 
@@ -27,7 +27,7 @@ export default function Header({ onOpenRanking, onOpenReset }) {
         </button>
         <div className="header-titles">
           <div className="eyebrow">Mesa de Poker</div>
-          <h1><span className="suit gold">♠</span>Poker dos Meninos<span className="suit red">♥</span></h1>
+          <h1><span className="suit gold">♠</span>Cacifes<span className="suit red">♥</span></h1>
         </div>
         <div className="top-bar-spacer" />
       </div>
@@ -40,6 +40,44 @@ export default function Header({ onOpenRanking, onOpenReset }) {
               onClick={() => { setMenuOpen(false); onOpenRanking() }}
             >
               <span className="icon">🂡</span> Ranking das mãos
+            </button>
+            <button
+              className="menu-item"
+              onClick={() => { setMenuOpen(false); onOpenTimer() }}
+            >
+              <span className="icon">⏱️</span> Timer de blinds
+            </button>
+            <button
+              className="menu-item"
+              onClick={() => { setMenuOpen(false); onOpenHistory() }}
+            >
+              <span className="icon">📜</span> Histórico de jogos
+            </button>
+            <button
+              className="menu-item"
+              onClick={() => { setMenuOpen(false); onOpenStats() }}
+            >
+              <span className="icon">📊</span> Estatísticas
+            </button>
+            <button
+              className="menu-item"
+              onClick={() => { setMenuOpen(false); onOpenThemes() }}
+            >
+              <span className="icon">🎨</span> Temas
+            </button>
+            {canInstall && (
+              <button
+                className="menu-item"
+                onClick={() => { setMenuOpen(false); onInstall() }}
+              >
+                <span className="icon">📲</span> Instalar app
+              </button>
+            )}
+            <button
+              className="menu-item"
+              onClick={() => { setMenuOpen(false); onEndNight() }}
+            >
+              <span className="icon">✅</span> Encerrar jogo
             </button>
             <button
               className="menu-item danger"

@@ -1,4 +1,4 @@
-export default function BuyInRow({ buyIn, onChange }) {
+export default function BuyInRow({ buyIn, onChange, onBlur }) {
   return (
     <div className="buyin-row">
       <span className="buyin-label">Valor do cacife</span>
@@ -11,6 +11,7 @@ export default function BuyInRow({ buyIn, onChange }) {
           inputMode="decimal"
           value={buyIn}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={(e) => onBlur && onBlur(e.target.value)}
         />
       </div>
     </div>

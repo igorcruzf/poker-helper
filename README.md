@@ -1,4 +1,4 @@
-# ♠ Poker dos Meninos
+# ♠ Cacifes
 
 Controle de cacifes e saldos para a noite de poker.
 

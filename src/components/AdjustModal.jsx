@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { fmt, computeSaldo } from '../utils.js'
+import { fmt, computeSaldo, parseMoney } from '../utils.js'
 
 export default function AdjustModal({ player, buyIn, onCancel, onConfirm }) {
   const [value, setValue] = useState('')
@@ -15,7 +15,7 @@ export default function AdjustModal({ player, buyIn, onCancel, onConfirm }) {
   if (!player) return null
 
   const currentSaldo = computeSaldo(player, buyIn)
-  const delta = parseFloat(value) || 0
+  const delta = parseMoney(value, { fallback: 0 })
   const finalSaldo = currentSaldo + delta
 
   return (

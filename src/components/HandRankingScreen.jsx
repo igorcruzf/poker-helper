@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { handRankings } from '../data/handRankings.js'
 
 function cardUrl(code) {
@@ -5,11 +6,22 @@ function cardUrl(code) {
 }
 
 export default function HandRankingScreen({ onBack }) {
+  const [compact, setCompact] = useState(false)
+
   return (
     <div className="rail screen-enter">
       <div className="card">
-        <button className="back-link" onClick={onBack}>← Voltar</button>
-        <div className="ranking-list">
+        <div className="ranking-header">
+          <button className="back-link" onClick={onBack}>← Voltar</button>
+          <button
+            className="view-toggle"
+            onClick={() => setCompact((c) => !c)}
+            title={compact ? 'Visão detalhada' : 'Visão compacta (cabe na tela)'}
+          >
+            {compact ? 'Detalhado' : 'Compacto'}
+          </button>
+        </div>
+        <div className={`ranking-list${compact ? ' compact' : ''}`}>
           {handRankings.map((hand, i) => (
             <div className="ranking-item" key={hand.name}>
               <div className="ranking-rank">{i + 1}</div>

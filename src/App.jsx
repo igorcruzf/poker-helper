@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { useLocalStorage } from './hooks/useLocalStorage.js'
-import { computeSaldo } from './utils.js'
+import { useInstallPrompt } from './hooks/useInstallPrompt.js'
+import { useUndoableLocalStorage } from './hooks/useUndoableLocalStorage.js'
+import { useTheme } from './hooks/useTheme.js'
+import { useBlindsTimer } from './hooks/useBlindsTimer.js'
+import { computeSaldo, parseMoney } from './utils.js'
 
 import Header from './components/Header.jsx'
 import BuyInRow from './components/BuyInRow.jsx'
@@ -11,6 +15,11 @@ import AdjustModal from './components/AdjustModal.jsx'
 import ExportModal from './components/ExportModal.jsx'
 import ResetModal from './components/ResetModal.jsx'
 import HandRankingScreen from './components/HandRankingScreen.jsx'
+import ThemeModal from './components/ThemeModal.jsx'
+import HistoryModal from './components/HistoryModal.jsx'
+import StatsModal from './components/StatsModal.jsx'
+import BlindsTimerModal from './components/BlindsTimer.jsx'
+import EndGameModal from './components/EndGameModal.jsx'
 
 const DEFAULT_BUYIN = 5.0
 
@@ -19,24 +28,135 @@ function uid() {
 }
 
 export default function App() {
-  const [state, setState] = useLocalStorage('poker-dos-meninos-v1', {
+  const [state, setState, undo, canUndo] = useUndoableLocalStorage('poker-dos-meninos-v1', {
     buyIn: DEFAULT_BUYIN,
     players: [],
   })
-
+  const [history, setHistory] = useLocalStorage('poker-dos-meninos-history-v1', [])
+  const [theme, setTheme] = useTheme()
+  const [copyEndsGame, setCopyEndsGame] = useLocalStorage('poker-copy-ends-game', true)
+  const timer = useBlindsTimer()
+  const { canInstall, promptInstall } = useInstallPrompt()
   const [view, setView] = useState('home') // 'home' | 'ranking'
   const [deletingPlayer, setDeletingPlayer] = useState(null)
   const [adjustingPlayer, setAdjustingPlayer] = useState(null)
   const [exportOpen, setExportOpen] = useState(false)
   const [resetOpen, setResetOpen] = useState(false)
+  const [themeOpen, setThemeOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [statsOpen, setStatsOpen] = useState(false)
+  const [timerOpen, setTimerOpen] = useState(false)
+  const [endGameOpen, setEndGameOpen] = useState(false)
   const [newPlayerId, setNewPlayerId] = useState(null)
+  const [sort, setSort] = useState({ key: null, dir: 'asc' })
+  const [dragId, setDragId] = useState(null)
 
   const buyIn = state.buyIn
   const players = state.players
 
+  function toggleSort(key) {
+    setSort((s) =>
+      s.key === key
+        ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' }
+        : { key, dir: 'desc' }
+    )
+  }
+
+  const sortedPlayers = (() => {
+    if (!sort.key) return players
+    const factor = sort.dir === 'asc' ? 1 : -1
+    return [...players].sort((a, b) => {
+      let av, bv
+      if (sort.key === 'nome') {
+        return factor * a.name.localeCompare(b.name, 'pt', { sensitivity: 'base' })
+      } else if (sort.key === 'cacifes') {
+        av = a.cacifes
+        bv = b.cacifes
+      } else {
+        av = computeSaldo(a, buyIn)
+        bv = computeSaldo(b, buyIn)
+      }
+      return factor * (av - bv)
+    })
+  })()
+
+  function sortArrow(key) {
+    if (sort.key !== key) return ''
+    return sort.dir === 'asc' ? ' ▲' : ' ▼'
+  }
+
   function handleBuyInChange(raw) {
     const v = parseFloat(raw)
     setState((s) => ({ ...s, buyIn: isNaN(v) ? 0 : v }))
+  }
+
+  function handleBuyInBlur(raw) {
+    const v = parseMoney(raw, { min: 0, fallback: 0 })
+    setState((s) => ({ ...s, buyIn: v }))
+  }
+
+  // Drag-and-drop: só habilitado quando não há ordenação por coluna
+  const dragEnabled = !sort.key
+
+  function handleDragStart(e, id) {
+    setDragId(id)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  function handleDrop(e, targetId) {
+    e.preventDefault()
+    if (!dragId || dragId === targetId) return
+    setState((s) => {
+      const list = [...s.players]
+      const from = list.findIndex((p) => p.id === dragId)
+      const to = list.findIndex((p) => p.id === targetId)
+      if (from === -1 || to === -1) return s
+      const [moved] = list.splice(from, 1)
+      list.splice(to, 0, moved)
+      return { ...s, players: list }
+    })
+    setDragId(null)
+  }
+
+  function handleDragEnd() {
+    setDragId(null)
+  }
+
+  function endGame() {
+    if (players.length === 0) return
+    const snapshot = {
+      id: 'n_' + Date.now(),
+      date: Date.now(),
+      buyIn,
+      players: players.map((p) => ({
+        name: p.name,
+        cacifes: p.cacifes,
+        saldo: computeSaldo(p, buyIn),
+      })),
+    }
+    setHistory((h) => [...h, snapshot])
+    setState((s) => ({
+      ...s,
+      players: s.players.map((p) => ({ ...p, cacifes: 1, adjustment: 0 })),
+    }))
+  }
+
+  function confirmEndGame() {
+    endGame()
+    setEndGameOpen(false)
+  }
+
+  function deleteNight(id) {
+    setHistory((h) => h.filter((n) => n.id !== id))
+  }
+
+  function clearHistory() {
+    setHistory([])
   }
 
   function addPlayer() {
@@ -101,7 +221,31 @@ export default function App() {
         <Header
           onOpenRanking={() => setView('ranking')}
           onOpenReset={() => setResetOpen(true)}
+          onOpenTimer={() => setTimerOpen(true)}
+          onOpenHistory={() => setHistoryOpen(true)}
+          onOpenStats={() => setStatsOpen(true)}
+          onOpenThemes={() => setThemeOpen(true)}
+          onEndNight={() => setEndGameOpen(true)}
+          canInstall={canInstall}
+          onInstall={promptInstall}
         />
+
+        {timer.active && (
+          <button
+            className={`timer-bar${timer.awaitingConfirm ? ' alert' : ''}`}
+            onClick={() => setTimerOpen(true)}
+            title="Abrir timer de blinds"
+          >
+            <span className="timer-bar-time">
+              {String(Math.floor(timer.secondsLeft / 60)).padStart(2, '0')}:
+              {String(timer.secondsLeft % 60).padStart(2, '0')}
+            </span>
+            <span className="timer-bar-info">
+              Nível {timer.level + 1} · {timer.smallBlind}/{timer.bigBlind}
+            </span>
+            {timer.awaitingConfirm && <span className="timer-bar-flag">⏰ Confirmar</span>}
+          </button>
+        )}
 
         {view === 'ranking' ? (
           <HandRankingScreen onBack={() => setView('home')} />
@@ -109,19 +253,34 @@ export default function App() {
           <>
             <div className="rail">
               <div className="card">
-                <BuyInRow buyIn={buyIn} onChange={handleBuyInChange} />
+                <BuyInRow buyIn={buyIn} onChange={handleBuyInChange} onBlur={handleBuyInBlur} />
 
                 {players.length > 0 && (
                   <div className="col-labels">
                     <span></span>
-                    <span>Nome</span>
-                    <span>Cacifes</span>
-                    <span>Saldo</span>
+                    <span
+                      className={`sortable${sort.key === 'nome' ? ' active' : ''}`}
+                      onClick={() => toggleSort('nome')}
+                    >
+                      Nome{sortArrow('nome')}
+                    </span>
+                    <span
+                      className={`sortable${sort.key === 'cacifes' ? ' active' : ''}`}
+                      onClick={() => toggleSort('cacifes')}
+                    >
+                      Cacifes{sortArrow('cacifes')}
+                    </span>
+                    <span
+                      className={`sortable${sort.key === 'saldo' ? ' active' : ''}`}
+                      onClick={() => toggleSort('saldo')}
+                    >
+                      Saldo{sortArrow('saldo')}
+                    </span>
                   </div>
                 )}
 
                 <div className="players">
-                  {players.map((p) => (
+                  {sortedPlayers.map((p) => (
                     <PlayerRow
                       key={p.id}
                       player={p}
@@ -132,6 +291,12 @@ export default function App() {
                       onOpenAdjust={setAdjustingPlayer}
                       autoFocus={p.id === newPlayerId}
                       onFocused={() => setNewPlayerId(null)}
+                      dragEnabled={dragEnabled}
+                      onDragStart={handleDragStart}
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      onDragEnd={handleDragEnd}
+                      isDragging={dragId === p.id}
                     />
                   ))}
                 </div>
@@ -162,6 +327,12 @@ export default function App() {
         )}
       </div>
 
+      {canUndo && (
+        <button className="undo-fab" onClick={undo} title="Desfazer última ação">
+          ↩ Desfazer
+        </button>
+      )}
+
       <DeleteModal
         player={deletingPlayer}
         onCancel={() => setDeletingPlayer(null)}
@@ -180,6 +351,9 @@ export default function App() {
         onClose={() => setExportOpen(false)}
         buyIn={buyIn}
         players={players}
+        copyEndsGame={copyEndsGame}
+        setCopyEndsGame={setCopyEndsGame}
+        onEndGame={endGame}
       />
 
       <ResetModal
@@ -187,6 +361,39 @@ export default function App() {
         onCancel={() => setResetOpen(false)}
         onResetFull={resetFull}
         onResetKeepPlayers={resetKeepPlayers}
+      />
+
+      <ThemeModal
+        open={themeOpen}
+        theme={theme}
+        onSelect={setTheme}
+        onClose={() => setThemeOpen(false)}
+      />
+
+      <HistoryModal
+        open={historyOpen}
+        history={history}
+        onClose={() => setHistoryOpen(false)}
+        onDelete={deleteNight}
+        onClearAll={clearHistory}
+      />
+
+      <StatsModal
+        open={statsOpen}
+        history={history}
+        onClose={() => setStatsOpen(false)}
+      />
+
+      <BlindsTimerModal
+        open={timerOpen}
+        timer={timer}
+        onClose={() => setTimerOpen(false)}
+      />
+
+      <EndGameModal
+        open={endGameOpen}
+        onCancel={() => setEndGameOpen(false)}
+        onConfirm={confirmEndGame}
       />
     </div>
   )

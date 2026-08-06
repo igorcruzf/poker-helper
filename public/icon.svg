@@ -1,0 +1,58 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bodyGrad" cx="35%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#1F3A29" />
+      <stop offset="100%" stop-color="#122019" />
+    </radialGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E8C34A" />
+      <stop offset="100%" stop-color="#B8933F" />
+    </linearGradient>
+    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- corpo externo da ficha -->
+  <circle cx="256" cy="256" r="236" fill="#2F2C1E" filter="url(#softShadow)" />
+
+  <!-- tracos ao redor -->
+  <path d="M 210.97,24.34 L 301.03,24.34 L 293.78,61.64 L 218.22,61.64 Z" fill="#E8C34A" />
+  <path d="M 303.05,24.74 L 386.26,59.20 L 365.28,90.89 L 295.47,61.97 Z" fill="#E8C34A" />
+  <path d="M 387.97,60.35 L 451.65,124.03 L 420.15,145.28 L 366.72,91.85 Z" fill="#E8C34A" />
+  <path d="M 452.80,125.74 L 487.26,208.95 L 450.03,216.53 L 421.11,146.72 Z" fill="#E8C34A" />
+  <path d="M 487.66,210.97 L 487.66,301.03 L 450.36,293.78 L 450.36,218.22 Z" fill="#E8C34A" />
+  <path d="M 487.26,303.05 L 452.80,386.26 L 421.11,365.28 L 450.03,295.47 Z" fill="#E8C34A" />
+  <path d="M 451.65,387.97 L 387.97,451.65 L 366.72,420.15 L 420.15,366.72 Z" fill="#E8C34A" />
+  <path d="M 386.26,452.80 L 303.05,487.26 L 295.47,450.03 L 365.28,421.11 Z" fill="#E8C34A" />
+  <path d="M 301.03,487.66 L 210.97,487.66 L 218.22,450.36 L 293.78,450.36 Z" fill="#E8C34A" />
+  <path d="M 208.95,487.26 L 125.74,452.80 L 146.72,421.11 L 216.53,450.03 Z" fill="#E8C34A" />
+  <path d="M 124.03,451.65 L 60.35,387.97 L 91.85,366.72 L 145.28,420.15 Z" fill="#E8C34A" />
+  <path d="M 59.20,386.26 L 24.74,303.05 L 61.97,295.47 L 90.89,365.28 Z" fill="#E8C34A" />
+  <path d="M 24.34,301.03 L 24.34,210.97 L 61.64,218.22 L 61.64,293.78 Z" fill="#E8C34A" />
+  <path d="M 24.74,208.95 L 59.20,125.74 L 90.89,146.72 L 61.97,216.53 Z" fill="#E8C34A" />
+  <path d="M 60.35,124.03 L 124.03,60.35 L 145.28,91.85 L 91.85,145.28 Z" fill="#E8C34A" />
+  <path d="M 125.74,59.20 L 208.95,24.74 L 216.53,61.97 L 146.72,90.89 Z" fill="#E8C34A" />
+
+  <!-- corpo principal -->
+  <circle cx="256" cy="256" r="214" fill="url(#bodyGrad)" />
+
+  <!-- anel dourado -->
+  <circle cx="256" cy="256" r="176" fill="none" stroke="url(#goldGrad)" stroke-width="6" />
+  <circle cx="256" cy="256" r="158" fill="none" stroke="url(#goldGrad)" stroke-width="3" opacity="0.8" />
+
+  <!-- naipe de espadas central -->
+  <g transform="translate(256,250)">
+    <path d="
+      M 0,-72
+      C 38,-36 62,-6 62,26
+      C 62,54 40,72 14,72
+      C 7,72 2,70 0,68
+      C -2,70 -7,72 -14,72
+      C -40,72 -62,54 -62,26
+      C -62,-6 -38,-36 0,-72
+      Z"
+      fill="#F1E9C3" />
+    <path d="M 0,54 L -20,98 L 20,98 Z" fill="#F1E9C3" />
+  </g>
+</svg>
