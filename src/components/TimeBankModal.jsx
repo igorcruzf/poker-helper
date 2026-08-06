@@ -1,3 +1,5 @@
+import AlertToggles from './AlertToggles.jsx'
+
 export default function TimeBankModal({ open, timeBank, onClose }) {
   if (!open) return null
 
@@ -18,10 +20,13 @@ export default function TimeBankModal({ open, timeBank, onClose }) {
             <button className="timer-btn" onClick={dismiss}>Fechar</button>
           </div>
         ) : (
-          <div className="timer-actions">
-            <button className="timer-btn" onClick={start}>{running ? 'Reiniciar' : 'Iniciar'}</button>
-            {running && <button className="timer-btn secondary" onClick={stop}>Parar</button>}
-          </div>
+          <>
+            <AlertToggles />
+            <div className="timer-actions">
+              <button className="timer-btn" onClick={start}>{running ? 'Reiniciar' : 'Iniciar'}</button>
+              {running && <button className="timer-btn secondary" onClick={stop}>Parar</button>}
+            </div>
+          </>
         )}
       </div>
     </div>

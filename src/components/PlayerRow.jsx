@@ -4,12 +4,9 @@ import { fmt, saldoClass, computeSaldo } from '../utils.js'
 export default function PlayerRow({
   player,
   buyIn,
-  onRename,
   onCacifeChange,
   onDelete,
   onOpenAdjust,
-  autoFocus,
-  onFocused,
   dragEnabled,
   onDragStart,
   onDragOver,
@@ -20,7 +17,6 @@ export default function PlayerRow({
   const saldo = computeSaldo(player, buyIn)
   const [bump, setBump] = useState(false)
   const firstRun = useRef(true)
-  const nameInputRef = useRef(null)
 
   useEffect(() => {
     if (firstRun.current) {
@@ -32,16 +28,6 @@ export default function PlayerRow({
     return () => clearTimeout(t)
   }, [saldo])
 
-  // Auto-foco no nome ao criar o jogador (roda uma única vez, na montagem)
-  useEffect(() => {
-    if (autoFocus && nameInputRef.current) {
-      nameInputRef.current.focus()
-      nameInputRef.current.select()
-      onFocused?.()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   return (
     <div
       className={`player-row${isDragging ? ' dragging' : ''}`}
@@ -52,12 +38,7 @@ export default function PlayerRow({
       onDragEnd={dragEnabled ? onDragEnd : undefined}
     >
       <div className="chip-btn remove" onClick={() => onDelete(player)}>−</div>
-      <input
-        ref={nameInputRef}
-        className="name-input"
-        value={player.name}
-        onChange={(e) => onRename(player.id, e.target.value)}
-      />
+      <span className="player-name" title={player.name}>{player.name}</span>
       <div className="stepper">
         <div
           className="chip-btn small"

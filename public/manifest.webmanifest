@@ -1,13 +1,18 @@
 {
+  "id": "/",
   "name": "Cacifes",
   "short_name": "Cacifes",
   "description": "Controle de cacifes e saldos para a noite de poker.",
-  "start_url": ".",
-  "scope": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0E211B",
   "theme_color": "#0E211B",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "handle_links": "preferred",
   "icons": [
     {
       "src": "icon.svg",

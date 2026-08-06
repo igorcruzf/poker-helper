@@ -37,5 +37,9 @@ export function useSortedPlayers(players, buyIn) {
     })
   })()
 
-  return { sort, sortedPlayers, toggleSort, sortArrow, dragEnabled: !sort.key }
+  function clearSort() {
+    setSort({ key: null, dir: 'asc' })
+  }
+
+  return { sort, sortedPlayers, toggleSort, sortArrow, clearSort, dragEnabled: !sort.key }
 }

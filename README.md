@@ -1,55 +1,68 @@
 # ♠ Cacifes
 
-Controle de cacifes e saldos para a noite de poker.
+Controle de cacifes, saldos e acerto de contas para a noite de poker.
+Login e dados no Supabase; o app é um PWA em React + Vite.
 
 ## Rodando localmente
 
 ```bash
 npm install
+cp .env.example .env   # preencha com a URL e a anon key do seu projeto Supabase
 npm run dev
 ```
 
-Abre em `http://localhost:5173`.
+Abre em `http://localhost:5173`. Sem o `.env` o app sobe e mostra uma tela
+explicando o que falta configurar.
 
-Para gerar a versão de produção (arquivos estáticos que podem ser hospedados em qualquer lugar):
+Antes do primeiro login é preciso criar as tabelas no Supabase — o passo a passo
+completo (banco, Google, Vercel) está em [`SETUP.md`](SETUP.md).
 
 ```bash
-npm run build
+npm run build     # build de produção em dist/
+npm run test      # vitest
+npm run lint      # eslint
 ```
-
-Os arquivos ficam em `dist/`.
 
 ## Como funciona
 
-- Estado guardado no `localStorage` do navegador (arquivo `src/hooks/useLocalStorage.js`), então os dados persistem entre sessões no mesmo aparelho/navegador.
-- O saldo de cada jogador é **calculado**, não guardado diretamente: `saldo = ajustes manuais - (cacifes × valor do cacife)`. Por isso, ao mudar o valor do cacife, o saldo de todo mundo é recalculado automaticamente.
-- Cada jogador novo já entra com 1 cacife.
-
-## Evoluindo para banco de dados
-
-Toda a lógica de estado está centralizada em `src/App.jsx`, usando `useLocalStorage` como única fonte de persistência. Para migrar para um banco de dados (ex: Supabase, Firebase, ou uma API própria):
-
-1. Troque o hook `useLocalStorage` por um hook equivalente que busque/salve os dados remotamente (ex: `useState` + `useEffect` com `fetch`, ou React Query).
-2. Adicione um campo `paid` (pago) por jogador para controlar quem já acertou o saldo.
-3. O resto dos componentes (`PlayerRow`, `AdjustModal`, etc.) não precisa mudar — eles só recebem dados e disparam callbacks.
+- **Autenticação**: e-mail + senha ou Google, via Supabase Auth. A sessão fica
+  guardada no navegador e é renovada sozinha — só sai quem clicar em "Sair".
+- **Mesas**: cada noite é uma mesa. Você escolhe o valor do cacife, quem senta
+  (do seu elenco de jogadores) e quem centraliza o acerto no fim.
+- **Saldo é calculado, nunca guardado**: `saldo = ajustes - (cacifes × valor do cacife)`.
+  Mudar o valor do cacife recalcula a mesa inteira na hora.
+- **Acerto**: ao encerrar, o app gera as transferências em estrela — quem perdeu
+  paga uma pessoa só, e ela repassa a quem ganhou. São no máximo (n-1)
+  pagamentos em vez de todo mundo pagando todo mundo. Por padrão quem centraliza
+  é o maior ganhador; dá para fixar um jogador na criação da mesa.
+- **Quem já pagou**: cada transferência tem um check. O histórico mostra quanto
+  ainda falta acertar em cada mesa.
+- **Offline**: as alterações feitas sem rede ficam numa fila no `localStorage` e
+  sobem sozinhas quando a conexão volta.
 
 ## Estrutura
 
 ```
 src/
-  App.jsx                 estado principal e composição das telas
-  index.css                tema visual (mesa de poker)
-  utils.js                 formatação e cálculo de saldo
-  hooks/useLocalStorage.js persistência local
-  data/handRankings.js     ranking das mãos do Texas Hold'em
-  components/
-    Header.jsx             título + menu hambúrguer
-    BuyInRow.jsx            input do valor do cacife
-    PlayerRow.jsx           linha de cada jogador
-    TotalRow.jsx            total da mesa (verde/vermelho)
-    DeleteModal.jsx         confirmação de exclusão
-    AdjustModal.jsx         ajuste de saldo
-    ExportModal.jsx         resumo para copiar/enviar
-    ResetModal.jsx          resetar cacifes (100% ou mantendo jogadores)
-    HandRankingScreen.jsx   ranking das mãos do poker
+  App.jsx                     rotas + porteiro de autenticação
+  index.css                   tema visual (mesa de poker)
+  utils.js                    formatação e cálculo de saldo
+  lib/
+    supabase.js               cliente do Supabase
+    settlement.js             quem paga quem no fim da noite
+    syncQueue.js              fila de escritas offline
+  hooks/
+    useAuth.jsx               sessão do usuário
+    useRoster.js              elenco de jogadores recorrentes
+    useTables.js              lista de mesas + criação
+    useTable.js               estado vivo de uma mesa
+  screens/
+    LoginScreen.jsx           entrar / criar conta
+    TablesScreen.jsx          mesa em andamento + histórico
+    CreateTableScreen.jsx     cacife, jogadores e quem recebe
+    TableScreen.jsx           a tela de cacifes
+    SettlementScreen.jsx      acerto de contas e quem já pagou
+  components/                 peças de UI (sem lógica de persistência)
+  data/handRankings.js        ranking das mãos do Texas Hold'em
+supabase/schema.sql           tabelas, índices e RLS
 ```

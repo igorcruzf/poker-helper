@@ -1,4 +1,5 @@
 import { parseMoney } from '../utils.js'
+import AlertToggles from './AlertToggles.jsx'
 
 export default function BlindsTimerModal({ open, timer, onClose }) {
   if (!open) return null
@@ -62,6 +63,8 @@ export default function BlindsTimerModal({ open, timer, onClose }) {
 			<p className="modal-hint">
 			  O big blind é o dobro do small, e cada nível dobra o valor do anterior.
 			</p>
+
+			<AlertToggles />
 
 			<div className="timer-actions">
 			  <button className="timer-btn" onClick={running ? pause : start}>

@@ -1,302 +1,99 @@
-import { useState } from 'react'
-import { useLocalStorage } from './hooks/useLocalStorage.js'
-import { useInstallPrompt } from './hooks/useInstallPrompt.js'
+import { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from './hooks/useAuth.jsx'
+import { isSupabaseConfigured } from './lib/supabase.js'
+import { startQueueFlusher } from './lib/syncQueue.js'
 import { useTheme } from './hooks/useTheme.js'
-import { useBlindsTimer } from './hooks/useBlindsTimer.js'
-import { useTimeBank } from './hooks/useTimeBank.js'
-import { usePlayers } from './hooks/usePlayers.js'
-import { useHistory } from './hooks/useHistory.js'
-import { useModals } from './hooks/useModals.js'
-import { useSortedPlayers } from './hooks/useSortedPlayers.js'
-import { useDragReorder } from './hooks/useDragReorder.js'
 
-import Header from './components/Header.jsx'
-import BuyInRow from './components/BuyInRow.jsx'
-import PlayerRow from './components/PlayerRow.jsx'
-import TotalRow from './components/TotalRow.jsx'
-import DeleteModal from './components/DeleteModal.jsx'
-import AdjustModal from './components/AdjustModal.jsx'
-import ExportModal from './components/ExportModal.jsx'
-import ResetModal from './components/ResetModal.jsx'
+import LoginScreen from './screens/LoginScreen.jsx'
+import TablesScreen from './screens/TablesScreen.jsx'
+import CreateTableScreen from './screens/CreateTableScreen.jsx'
+import TableScreen from './screens/TableScreen.jsx'
+import SettlementScreen from './screens/SettlementScreen.jsx'
+import StatsScreen from './screens/StatsScreen.jsx'
+import SharedSettlementScreen from './screens/SharedSettlementScreen.jsx'
+import SharedTableScreen from './screens/SharedTableScreen.jsx'
 import HandRankingScreen from './components/HandRankingScreen.jsx'
-import ThemeModal from './components/ThemeModal.jsx'
-import HistoryModal from './components/HistoryModal.jsx'
-import StatsModal from './components/StatsModal.jsx'
-import BlindsTimerModal from './components/BlindsTimer.jsx'
-import TimeBankModal from './components/TimeBankModal.jsx'
-import EndGameModal from './components/EndGameModal.jsx'
 
-export default function App() {
-  const { history, addNight, deleteNight, clearHistory } = useHistory()
-  const {
-    buyIn,
-    players,
-    total,
-    handleBuyInChange,
-    handleBuyInBlur,
-    addPlayer: addPlayerToState,
-    renamePlayer,
-    changeCacife,
-    deletePlayer,
-    adjustPlayer,
-    reorderPlayers,
-    endGame,
-    resetFull: resetFullState,
-    resetKeepPlayers: resetKeepPlayersState,
-    undo,
-    canUndo,
-  } = usePlayers(addNight)
-  const [theme, setTheme] = useTheme()
-  const [copyEndsGame, setCopyEndsGame] = useLocalStorage('poker-copy-ends-game', true)
-  const timer = useBlindsTimer()
-  const timeBank = useTimeBank()
-  const { canInstall, promptInstall } = useInstallPrompt()
-  const [view, setView] = useState('home') // 'home' | 'ranking'
-  const {
-    deletingPlayer, setDeletingPlayer,
-    adjustingPlayer, setAdjustingPlayer,
-    exportOpen, setExportOpen,
-    resetOpen, setResetOpen,
-    themeOpen, setThemeOpen,
-    historyOpen, setHistoryOpen,
-    statsOpen, setStatsOpen,
-    timerOpen, setTimerOpen,
-    timeBankOpen, setTimeBankOpen,
-    endGameOpen, setEndGameOpen,
-  } = useModals()
-  const [newPlayerId, setNewPlayerId] = useState(null)
-  const { sort, sortedPlayers, toggleSort, sortArrow, dragEnabled } = useSortedPlayers(players, buyIn)
-  const { dragId, handleDragStart, handleDragOver, handleDrop, handleDragEnd } = useDragReorder(reorderPlayers)
+function Splash({ children }) {
+  return (
+    <div className="app-shell">
+      <div className="app"><div className="empty-state">{children}</div></div>
+    </div>
+  )
+}
 
-  function addPlayer() {
-    const id = addPlayerToState()
-    setNewPlayerId(id)
-  }
-
-  function confirmEndGame() {
-    endGame()
-    setEndGameOpen(false)
-  }
-
-  function confirmDelete(player) {
-    deletePlayer(player.id)
-    setDeletingPlayer(null)
-  }
-
-  function confirmAdjust(id, delta) {
-    adjustPlayer(id, delta)
-    setAdjustingPlayer(null)
-  }
-
-  function resetFull() {
-    resetFullState()
-    setResetOpen(false)
-  }
-
-  function resetKeepPlayers() {
-    resetKeepPlayersState()
-    setResetOpen(false)
-  }
-
+function ConfigMissing() {
   return (
     <div className="app-shell">
       <div className="app">
-        <Header
-          onOpenRanking={() => setView('ranking')}
-          onOpenReset={() => setResetOpen(true)}
-          onOpenTimer={() => setTimerOpen(true)}
-          onOpenTimeBank={() => setTimeBankOpen(true)}
-          onOpenHistory={() => setHistoryOpen(true)}
-          onOpenStats={() => setStatsOpen(true)}
-          onOpenThemes={() => setThemeOpen(true)}
-          onEndNight={() => setEndGameOpen(true)}
-          canInstall={canInstall}
-          onInstall={promptInstall}
-        />
-
-        {timer.active && (
-          <button
-            className={`timer-bar${timer.awaitingConfirm ? ' alert' : ''}`}
-            onClick={() => setTimerOpen(true)}
-            title="Abrir timer de blinds"
-          >
-            <span className="timer-bar-time">
-              {String(Math.floor(timer.secondsLeft / 60)).padStart(2, '0')}:
-              {String(timer.secondsLeft % 60).padStart(2, '0')}
-            </span>
-            <span className="timer-bar-info">
-              Nível {timer.level + 1} · {timer.smallBlind}/{timer.bigBlind}
-            </span>
-            {timer.awaitingConfirm && <span className="timer-bar-flag">⏰ Confirmar</span>}
-          </button>
-        )}
-
-        {(timeBank.running || timeBank.done) && (
-          <button
-            className={`timer-bar${timeBank.done ? ' alert' : ''}`}
-            onClick={() => setTimeBankOpen(true)}
-            title="Abrir time bank"
-          >
-            <span className="timer-bar-time">{String(timeBank.secondsLeft).padStart(2, '0')}</span>
-            <span className="timer-bar-info">Time bank</span>
-            {timeBank.done && <span className="timer-bar-flag">⏰ Esgotado</span>}
-          </button>
-        )}
-
-        {view === 'ranking' ? (
-          <HandRankingScreen onBack={() => setView('home')} />
-        ) : (
-          <>
-            <div className="rail">
-              <div className="card">
-                <BuyInRow buyIn={buyIn} onChange={handleBuyInChange} onBlur={handleBuyInBlur} />
-
-                {players.length > 0 && (
-                  <div className="col-labels">
-                    <span></span>
-                    <span
-                      className={`sortable${sort.key === 'nome' ? ' active' : ''}`}
-                      onClick={() => toggleSort('nome')}
-                    >
-                      Nome{sortArrow('nome')}
-                    </span>
-                    <span
-                      className={`sortable${sort.key === 'cacifes' ? ' active' : ''}`}
-                      onClick={() => toggleSort('cacifes')}
-                    >
-                      Cacifes{sortArrow('cacifes')}
-                    </span>
-                    <span
-                      className={`sortable${sort.key === 'saldo' ? ' active' : ''}`}
-                      onClick={() => toggleSort('saldo')}
-                    >
-                      Saldo{sortArrow('saldo')}
-                    </span>
-                  </div>
-                )}
-
-                <div className="players">
-                  {sortedPlayers.map((p) => (
-                    <PlayerRow
-                      key={p.id}
-                      player={p}
-                      buyIn={buyIn}
-                      onRename={renamePlayer}
-                      onCacifeChange={changeCacife}
-                      onDelete={setDeletingPlayer}
-                      onOpenAdjust={setAdjustingPlayer}
-                      autoFocus={p.id === newPlayerId}
-                      onFocused={() => setNewPlayerId(null)}
-                      dragEnabled={dragEnabled}
-                      onDragStart={handleDragStart}
-                      onDragOver={handleDragOver}
-                      onDrop={handleDrop}
-                      onDragEnd={handleDragEnd}
-                      isDragging={dragId === p.id}
-                    />
-                  ))}
-                </div>
-
-                {players.length === 0 && (
-                  <div className="empty-state">
-                    Nenhum jogador ainda.<br />Toque em "Novo jogador" abaixo para adicionar o primeiro.
-                  </div>
-                )}
-
-                {players.length > 0 && <TotalRow total={total} />}
-              </div>
-            </div>
-
-            <div className="footer-actions">
-              <button className="add-player-btn" onClick={addPlayer}>Novo jogador</button>
-              <button className="export-btn" title="Exportar resumo" onClick={() => setExportOpen(true)}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                  <line x1="12" y1="18" x2="12" y2="12" />
-                  <line x1="9" y1="15" x2="15" y2="15" />
-                </svg>
-                Copiar resumo
-              </button>
-            </div>
-          </>
-        )}
+        <div className="card" style={{ marginTop: 24 }}>
+          <p className="question">Falta configurar o Supabase</p>
+          <p className="modal-hint">
+            Crie um arquivo <code>.env</code> na raiz do projeto (veja <code>.env.example</code>) com
+            <code> VITE_SUPABASE_URL</code> e <code>VITE_SUPABASE_PUBLISHABLE_KEY</code> (ou
+            <code> VITE_SUPABASE_ANON_KEY</code>), e <strong>reinicie</strong> o <code>npm run dev</code> —
+            o Vite só lê o <code>.env</code> ao subir. Na Vercel, as mesmas variáveis vão em
+            Settings → Environment Variables, seguidas de um novo deploy.
+          </p>
+        </div>
       </div>
-
-      {canUndo && (
-        <button className="undo-fab" onClick={undo} title="Desfazer última ação">
-          ↩ Desfazer
-        </button>
-      )}
-
-      <DeleteModal
-        player={deletingPlayer}
-        onCancel={() => setDeletingPlayer(null)}
-        onConfirm={confirmDelete}
-      />
-
-      <AdjustModal
-        player={adjustingPlayer}
-        buyIn={buyIn}
-        onCancel={() => setAdjustingPlayer(null)}
-        onConfirm={confirmAdjust}
-      />
-
-      <ExportModal
-        open={exportOpen}
-        onClose={() => setExportOpen(false)}
-        buyIn={buyIn}
-        players={players}
-        copyEndsGame={copyEndsGame}
-        setCopyEndsGame={setCopyEndsGame}
-        onEndGame={endGame}
-      />
-
-      <ResetModal
-        open={resetOpen}
-        onCancel={() => setResetOpen(false)}
-        onResetFull={resetFull}
-        onResetKeepPlayers={resetKeepPlayers}
-      />
-
-      <ThemeModal
-        open={themeOpen}
-        theme={theme}
-        onSelect={setTheme}
-        onClose={() => setThemeOpen(false)}
-      />
-
-      <HistoryModal
-        open={historyOpen}
-        history={history}
-        onClose={() => setHistoryOpen(false)}
-        onDelete={deleteNight}
-        onClearAll={clearHistory}
-      />
-
-      <StatsModal
-        open={statsOpen}
-        history={history}
-        onClose={() => setStatsOpen(false)}
-      />
-
-      <BlindsTimerModal
-        open={timerOpen}
-        timer={timer}
-        onClose={() => setTimerOpen(false)}
-      />
-
-      <TimeBankModal
-        open={timeBankOpen}
-        timeBank={timeBank}
-        onClose={() => setTimeBankOpen(false)}
-      />
-
-      <EndGameModal
-        open={endGameOpen}
-        onCancel={() => setEndGameOpen(false)}
-        onConfirm={confirmEndGame}
-      />
     </div>
+  )
+}
+
+function RequireAuth({ children }) {
+  const { session, loading } = useAuth()
+  if (loading) return <Splash>Carregando…</Splash>
+  if (!session) return <Navigate to="/login" replace />
+  return children
+}
+
+function LoginRoute() {
+  const { session, loading } = useAuth()
+  if (loading) return <Splash>Carregando…</Splash>
+  if (session) return <Navigate to="/" replace />
+  return <LoginScreen />
+}
+
+function RankingRoute() {
+  const navigate = useNavigate()
+  return (
+    <div className="app-shell">
+      <div className="app">
+        <HandRankingScreen onBack={() => navigate(-1)} />
+      </div>
+    </div>
+  )
+}
+
+export default function App() {
+  // Tema é global (roda antes mesmo do login).
+  useTheme()
+
+  useEffect(() => startQueueFlusher(), [])
+
+  if (!isSupabaseConfigured) return <ConfigMissing />
+
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Pública: quem recebe o link do acerto não precisa de conta. */}
+          <Route path="/acerto/:token" element={<SharedSettlementScreen />} />
+          <Route path="/ao-vivo/:token" element={<SharedTableScreen />} />
+          <Route path="/login" element={<LoginRoute />} />
+          <Route path="/" element={<RequireAuth><TablesScreen /></RequireAuth>} />
+          <Route path="/nova" element={<RequireAuth><CreateTableScreen /></RequireAuth>} />
+          <Route path="/estatisticas" element={<RequireAuth><StatsScreen /></RequireAuth>} />
+          <Route path="/mesa/:id" element={<RequireAuth><TableScreen /></RequireAuth>} />
+          <Route path="/mesa/:id/acerto" element={<RequireAuth><SettlementScreen /></RequireAuth>} />
+          {/* Referência estática, sem dado de ninguém: aberta para o convidado
+              que chega pelo link do acerto poder consultar também. */}
+          <Route path="/ranking" element={<RankingRoute />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   )
 }

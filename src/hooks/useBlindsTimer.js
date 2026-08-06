@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { playBeep } from '../utils.js'
+import { fireAlert, stopAlertFeedback } from '../lib/alerts.js'
 
-export function useBlindsTimer() {
+// `onSync` recebe um retrato do timer a cada transição (iniciar, pausar,
+// zerar, próximo nível). Guardamos `endsAt` em vez do contador para que quem
+// abrir a mesa por link calcule os segundos sozinho — sem escrever a cada
+// segundo no banco.
+export function useBlindsTimer(onSync) {
   const [minutes, setMinutes] = useState(10)
   const [baseBlind, setBaseBlind] = useState(10)
   const [level, setLevel] = useState(0)
@@ -10,6 +14,12 @@ export function useBlindsTimer() {
   const [awaitingConfirm, setAwaitingConfirm] = useState(false)
   const [active, setActive] = useState(false)
   const beepRef = useRef(null)
+  const syncRef = useRef(onSync)
+  syncRef.current = onSync
+
+  const sync = useCallback((snapshot) => {
+	if (syncRef.current) syncRef.current(snapshot)
+  }, [])
 
   // Mantém o relógio sincronizado com os minutos enquanto não iniciado
   useEffect(() => {
@@ -21,6 +31,7 @@ export function useBlindsTimer() {
 	  clearInterval(beepRef.current)
 	  beepRef.current = null
 	}
+	stopAlertFeedback()
   }
 
   // Contagem regressiva
@@ -37,10 +48,11 @@ export function useBlindsTimer() {
 	if (running && !awaitingConfirm && secondsLeft === 0) {
 	  setRunning(false)
 	  setAwaitingConfirm(true)
-	  playBeep()
-	  beepRef.current = setInterval(playBeep, 1200)
+	  fireAlert()
+	  beepRef.current = setInterval(() => fireAlert(), 1200)
+	  sync({ active: true, running: false, awaitingConfirm: true, level, minutes, baseBlind, secondsLeft: 0, endsAt: null })
 	}
-  }, [secondsLeft, running, awaitingConfirm])
+  }, [secondsLeft, running, awaitingConfirm, sync, level, minutes, baseBlind])
 
   useEffect(() => () => stopBeep(), [])
 
@@ -50,21 +62,28 @@ export function useBlindsTimer() {
 
   const start = useCallback(() => {
 	stopBeep()
+	const next = secondsLeft > 0 ? secondsLeft : minutes * 60
 	setActive(true)
 	setAwaitingConfirm(false)
-	setSecondsLeft((s) => (s > 0 ? s : minutes * 60))
+	setSecondsLeft(next)
 	setRunning(true)
-  }, [minutes])
+	sync({ active: true, running: true, awaitingConfirm: false, level, minutes, baseBlind, secondsLeft: next, endsAt: Date.now() + next * 1000 })
+  }, [minutes, secondsLeft, sync, level, baseBlind])
 
-  const pause = useCallback(() => setRunning(false), [])
+  const pause = useCallback(() => {
+	setRunning(false)
+	sync({ active: true, running: false, awaitingConfirm: false, level, minutes, baseBlind, secondsLeft, endsAt: null })
+  }, [sync, level, minutes, baseBlind, secondsLeft])
 
   const confirmNext = useCallback(() => {
 	stopBeep()
+	const full = minutes * 60
 	setLevel((l) => l + 1)
-	setSecondsLeft(minutes * 60)
+	setSecondsLeft(full)
 	setAwaitingConfirm(false)
 	setRunning(true)
-  }, [minutes])
+	sync({ active: true, running: true, awaitingConfirm: false, level: level + 1, minutes, baseBlind, secondsLeft: full, endsAt: Date.now() + full * 1000 })
+  }, [minutes, sync, level, baseBlind])
 
   const reset = useCallback(() => {
 	stopBeep()
@@ -73,7 +92,8 @@ export function useBlindsTimer() {
 	setActive(false)
 	setLevel(0)
 	setSecondsLeft(minutes * 60)
-  }, [minutes])
+	sync({ active: false, running: false, awaitingConfirm: false, level: 0, minutes, baseBlind, secondsLeft: minutes * 60, endsAt: null })
+  }, [minutes, sync, baseBlind])
 
   return {
 	minutes, setMinutes,

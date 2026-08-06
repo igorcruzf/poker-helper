@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { playBeep } from '../utils.js'
+import { fireAlert, stopAlertFeedback } from '../lib/alerts.js'
 
 const DURATION = 30
 
@@ -16,6 +16,7 @@ export function useTimeBank() {
       clearInterval(alertRef.current)
       alertRef.current = null
     }
+    stopAlertFeedback()
   }
 
   useEffect(() => {
@@ -30,8 +31,9 @@ export function useTimeBank() {
     if (running && secondsLeft === 0) {
       setRunning(false)
       setDone(true)
-      playBeep({ frequency: 880 })
-      alertRef.current = setInterval(() => playBeep({ frequency: 880 }), 1200)
+      const alerta = () => fireAlert({ beep: { frequency: 880 } })
+      alerta()
+      alertRef.current = setInterval(alerta, 1200)
     }
   }, [secondsLeft, running])
 

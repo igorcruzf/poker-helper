@@ -55,3 +55,15 @@ export function fmtDate(ts) {
     return ''
   }
 }
+
+// Fisher-Yates. Usado para sortear a ordem dos lugares na criação da mesa.
+export function shuffle(list) {
+  const out = [...list]
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const tmp = out[i]
+    out[i] = out[j]
+    out[j] = tmp
+  }
+  return out
+}
