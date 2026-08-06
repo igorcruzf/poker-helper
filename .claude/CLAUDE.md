@@ -93,8 +93,10 @@ Mid-game actions live in `TableActionsBar` (sticky bottom): add player, timer, t
 "Encerrar" last. The hamburger holds navigation and settings, grouped into sections built from a
 declarative array — a falsy item drops out and its section disappears if it empties. Player names
 are set when seating someone and are not editable on the table screen. Timer and time bank alerts
-respect `lib/alerts.js` (sound + vibration prefs in localStorage, read at fire time so a toggle
-applies to the alert already looping); vibration is hidden where `navigator.vibrate` is absent.
+go through `lib/alerts.js` — a single sound preference in localStorage, read at fire time so
+toggling it applies to an alert that is already looping. Vibration was tried and removed: browsers
+drop `navigator.vibrate()` whenever the tab is backgrounded or the screen is off, which is exactly
+when a blinds timer needs to reach someone, so it never fired when it mattered.
 
 `TableScreen` redirects to the settlement screen when the table is `finished`. Modals are
 mounted unconditionally and self-hide via an `open`/data prop — follow that pattern rather than

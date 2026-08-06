@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { fireAlert, stopAlertFeedback } from '../lib/alerts.js'
+import { fireAlert } from '../lib/alerts.js'
 
 // `onSync` recebe um retrato do timer a cada transição (iniciar, pausar,
 // zerar, próximo nível). Guardamos `endsAt` em vez do contador para que quem
@@ -31,7 +31,6 @@ export function useBlindsTimer(onSync) {
 	  clearInterval(beepRef.current)
 	  beepRef.current = null
 	}
-	stopAlertFeedback()
   }
 
   // Contagem regressiva

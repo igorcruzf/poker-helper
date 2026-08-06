@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { fireAlert, stopAlertFeedback } from '../lib/alerts.js'
+import { fireAlert } from '../lib/alerts.js'
 
 const DURATION = 30
 
@@ -16,7 +16,6 @@ export function useTimeBank() {
       clearInterval(alertRef.current)
       alertRef.current = null
     }
-    stopAlertFeedback()
   }
 
   useEffect(() => {
