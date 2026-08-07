@@ -67,6 +67,34 @@ export function useRoster() {
     return { data: row, error: null }
   }
 
+  // Corrigir o nome de alguém do elenco. Diferente de apagar, aqui a correção
+  // alcança o histórico: o snapshot em `table_players` existe para o passado não
+  // mudar quando alguém sai do elenco, mas um nome digitado errado precisa ser
+  // consertado em todas as noites — senão as estatísticas rachariam em dois.
+  async function renameInRoster(id, { name: rawName, nickname: rawNickname }) {
+    const name = String(rawName || '').trim()
+    const nickname = String(rawNickname || '').trim()
+    if (!name) return { error: new Error('Nome vazio') }
+
+    const { error } = await supabase
+      .from('players')
+      .update({ name, nickname: nickname || null })
+      .eq('id', id)
+    reportResult(error)
+    if (error) return { error }
+
+    const label = playerLabel({ name, nickname })
+    const { error: historyError } = await supabase
+      .from('table_players')
+      .update({ name: label })
+      .eq('player_id', id)
+    reportResult(historyError)
+    if (historyError) return { error: historyError }
+
+    await load()
+    return { error: null }
+  }
+
   async function removeFromRoster(id) {
     setRoster((prev) => prev.filter((p) => p.id !== id))
     const { error } = await supabase.from('players').delete().eq('id', id)
@@ -75,5 +103,5 @@ export function useRoster() {
     return { error }
   }
 
-  return { roster, loading, error, addToRoster, removeFromRoster, reload: load }
+  return { roster, loading, error, addToRoster, renameInRoster, removeFromRoster, reload: load }
 }

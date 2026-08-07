@@ -16,7 +16,7 @@ npm install      # install deps
 npm run dev      # Vite dev server, http://localhost:5173
 npm run build    # production build -> dist/
 npm run preview  # preview the production build locally
-npm run test     # vitest
+npm run test     # vitest — two projects: `logica` (node) and `componentes` (jsdom)
 npm run lint     # eslint
 ```
 
@@ -61,7 +61,10 @@ created the row; it grants nothing.
   be added or would silently merge into the first. `playerLabel()` in `utils.js` renders
   `André (Careca)`, and that label is what gets snapshotted into `table_players.name` when
   someone sits down, so history stays unambiguous forever. The nickname input only appears when
-  the typed name already exists in the roster.
+  the typed name already exists in the roster. Renaming a roster player is the one operation that
+  **does** rewrite those snapshots (`renameInRoster` updates `table_players` too): the snapshot
+  exists so leaving the roster doesn't erase your past, but a typo has to be fixable everywhere
+  or the stats would split across two spellings.
   A roster player is **not** an account: the bridge is `group_members.player_id`. A player nobody
   claimed is a **visitor** — it still has a page and the full night-by-night history, because the
   stats hang off the player, not off the account. It becomes someone's the moment a member links
@@ -85,11 +88,13 @@ and the three screens that render players.
 ### State ownership
 
 Supabase is the source of truth. `src/hooks/useTable.js` owns the live table: it updates React
-state optimistically, then persists per-row with a ~500ms debounce. Writes go through
-`saveRow` in `src/lib/syncQueue.js`, which retries a failing write up to three times (only for
-network errors — RLS and bad data never improve on repetition) before parking it in
-localStorage (last write per row wins). Undo is an in-memory stack of player snapshots; undoing
-diffs the snapshot against current state and issues the matching insert/delete/update.
+state optimistically, then persists per-row with a ~500ms debounce. Persistence, undo and table
+state are three separate concerns and live in three files — `useDebouncedSave` (merges patches
+per row and can `flush()` before end-of-game maths), `usePlayerUndo` (stack of player snapshots,
+reverted through `lib/playersDiff.js` so only the changed rows are written), and `useTable`
+itself. Writes go through `saveRow` in `src/lib/syncQueue.js`, which retries a failing write up
+to three times (only for network errors — RLS and bad data never improve on repetition) before
+parking it in localStorage (last write per row wins).
 
 `syncQueue` also owns the connection state, which is *"did the database answer?"*, not
 `navigator.onLine` — the phone can be on the house wi-fi and still not reach Supabase. Every
@@ -97,18 +102,39 @@ call feeds it through `reportResult(error)`, and `SyncStatusBar` (mounted once i
 turns that into the persistent "you're offline, keep playing" banner and the transient "back
 online, table synced" one, which only fires once the parked queue has actually drained.
 
-Two data hooks own scope. `useAuth.jsx` holds the session; `GroupProvider` in `useGroups.jsx`
-holds the memberships and which group is open (localStorage, falling back to the first
-membership when the stored id is stale). Everything below reads `activeGroupId` from it:
+Three providers wrap the router, in this order: `AuthProvider` (session),
+`MyProfileProvider` (your own profile — the route gates need it on every navigation) and
+`GroupProvider`. Routes go through `Guarded`, which composes the gates: session → profile filled
+in → group open. A brand-new account has no `first_name`, so it lands on `/perfil?novo=1` with
+the form already open, and returns to where it was heading once saved.
+
+Two things about that gate are load-bearing and easy to break. Its `loading` is **derived**
+(`!!user && loadedFor !== user.id`), not a separate flag: with a flag there is one frame on every
+reload where the session has arrived but the profile fetch has not started, and the gate reads
+"no name" and bounces the person into the signup form. And it fires **once per account**
+(`markSetupOffered`, localStorage) and never on a failed read — an old account whose backfilled
+row has a null name would otherwise be sent to the form on every single F5, with no way out.
+`useMyProfile.test.jsx` locks both.
+
+`GroupProvider` holds the memberships and which group is open — remembered per account in
+localStorage, falling back to the first membership when the stored id is stale, so reopening the
+app lands you back in the group you were last using. Everything below reads `activeGroupId`:
 `useRoster.js` (the group's roster), `useTables.js` (list + creation + delete),
 `useGroupAdmin.js` (members and join requests — deliberately outside the provider, since only
-the groups screen needs those two queries). `useLocalStorage` survives only for device-local
+the groups screen needs those two queries) and `useGroupPeople.js`, which is the one the *game*
+screens use: it indexes account, display name, photo, pix key and the profile route by
+`player_id`, because that is the id the table, the settlement and the stats all speak. `useLocalStorage` survives only for device-local
 preferences (theme, "copy ends game").
 
 Deleting a table confirms with the server (`.delete().select()`): an empty result means RLS
 refused in silence, which is reported instead of the row quietly reappearing on next load.
 
 ### Screens & routing
+
+Password recovery has a belt-and-braces landing: the emailed link points at `/nova-senha`, but
+`RequireAuth` also renders `NewPasswordScreen` whenever `useAuth().recovering` is set (from the
+`PASSWORD_RECOVERY` event), so the flow still completes if that URL was never allowlisted in the
+Supabase dashboard and the person lands on the site root instead.
 
 `react-router-dom`, with `App.jsx` holding the routes and two gates: `RequireAuth`, then
 `RequireGroup`, which sends anyone without a group to `/grupos` to create one or join with a
@@ -118,7 +144,8 @@ the public `/ao-vivo` and `/acerto` views instead, which already handle read-onl
 
 | Route | Screen |
 | --- | --- |
-| `/login` | `LoginScreen` — email+password or Google |
+| `/login` | `LoginScreen` — sign in, sign up, or ask for a password reset (one screen, three modes) |
+| `/nova-senha` | `NewPasswordScreen` — end of the reset flow |
 | `/grupos` | `GroupsScreen` — group list, the open group, invite code, "I play as" |
 | `/entrar/:code` | same screen, opening the join modal with the code prefilled |
 | `/perfil`, `/perfil/:userId` | `ProfileScreen` — a person, entered from the account side |
@@ -127,7 +154,7 @@ the public `/ao-vivo` and `/acerto` views instead, which already handle read-onl
 | `/nova` | `CreateTableScreen` — buy-in, roster picks, who collects |
 | `/mesa/:id` | `TableScreen` — the cacifes table |
 | `/mesa/:id/acerto` | `SettlementScreen` — who owes whom, marking payments, reopen |
-| `/estatisticas` | `StatsScreen` — podium, diverging saldo bars, highlight tiles |
+| `/estatisticas` | `StatsScreen` — podium, diverging saldo bars, highlight tiles, period filter |
 | `/acerto/:token` | `SharedSettlementScreen` — **public**, sits outside `RequireAuth` |
 | `/ao-vivo/:token` | `SharedTableScreen` — **public** read-only live table |
 | `/ranking` | `HandRankingScreen` — static reference, also public |
@@ -152,7 +179,10 @@ transitions (start/pause/reset/next level), and each viewer derives the remainin
 Stats visuals follow the `dataviz` skill: the saldo bars are a diverging encoding whose green/red
 pair (`#4ADE80`/`#F87171`) sits in the validator's 6–8 deutan band, which is legal *only* because
 bar direction and the signed value repeat the information. Don't swap those hexes without
-re-running `scripts/validate_palette.js`.
+re-running `scripts/validate_palette.js` — **note that script is currently missing from the repo**,
+so any change to the pair needs it restored first. The `light` theme overrides the pair with
+`#1B8A46`/`#D14343`, because the originals land at ~1.6:1 on paper and a graphical object needs
+3:1; hue and direction are unchanged.
 
 Mid-game actions live in `TableActionsBar` (sticky bottom): add player, timer, time bank, and
 "Encerrar" last. The hamburger holds navigation and settings, grouped into sections built from a
@@ -176,13 +206,49 @@ which roster players are already claimed, and RLS already hides the join request
 also loads the members' profiles in a separate query, since PostgREST can't hop from
 `group_members` to `profiles` through `auth.users`.
 
-Profile identity shows up in the group screens and never on the cacifes table: mid-game the row
-needs a name and a number, not an avatar. `ProfileScreen` serves one page from two directions —
+Profile identity now reaches the cacifes table too: each row shows the person's photo (initials
+when there is none) and tapping the name opens their page. Editing a **name** is split by who
+owns it — a roster player claimed by an account is renamed only by that person, from their
+profile, so the roster lists show "open profile" instead of a pencil there; the pencil stays for
+visitors, who have nobody to edit them.
+
+That split is what `sync_my_player_name` exists for: changing your first name rewrites the
+roster row **and** the `table_players` snapshots in every group you belong to, so the stats keep
+aggregating you as one person. Uniqueness is per `(group, name, nickname)`, so the same rename
+can collide in one group and not another — the function validates every group first and either
+returns the ones that need a nickname (changing nothing) or applies all of them. Never half. `ProfileScreen` serves one page from two directions —
 `/perfil/:userId` starts at an account and walks to its player, `/jogador/:playerId` starts at a
 roster player and looks for the account that claims it. Either way the numbers come from the
 **player** name via `computePlayerStats` over the open group's finished tables, so an unclaimed
 player (badged "visitante") has a full history and an account with no player linked has none.
-Names in `StatsScreen` link to whichever of the two routes applies.
+Names in `StatsScreen` link to whichever of the two routes applies. Both screens filter by
+period (`filterHistory` in `stats.js`); the profile also shows head-to-head records, which only
+count nights where both players actually sat at the same table — comparing two lifetime totals
+says nothing when the two played different nights.
+
+Every screen below the root carries a `BackBar`. It takes an explicit `to` where history would
+mislead: from the settlement, going "back" to `/mesa/:id` would bounce straight here again,
+because a finished table redirects to its settlement.
+
+`PendingPayments` sits at the top of `TablesScreen` and is the closest thing to a nudge without
+push notifications: it resolves `group_members.player_id` to the seats you occupied and shows
+what you owe (with the pix button) and what you're owed, across every finished table.
+
+`ErrorBoundary` wraps the routes and catches what `ScreenStatus` cannot: a render that throws, or
+a `lazy()` chunk that never arrives. The second is the common one in production — deploy while a
+tab is open and the old chunk filenames stop existing — so a chunk error reloads the page once
+(`sessionStorage` guard, same pattern as `appUpdate.js`) instead of showing a dead screen. Keep
+`isChunkError` narrow: widening it makes the app reload on top of real bugs and hide them.
+
+In dev the same "two Reacts" symptom comes from Vite re-running its dependency optimizer
+mid-session — an open tab holds `react.js?v=OLD` while a fresh dynamic import gets `?v=NEW`, and
+hooks blow up with `Cannot read properties of null (reading 'useState')`. `optimizeDeps.include`
+in `vite.config.js` pre-bundles everything on boot to keep the hash stable; if it happens anyway,
+delete `node_modules/.vite` and restart.
+
+`ScreenStatus` is the shared answer to "the screen is stuck": spinner while loading, a different
+message once it passes 6s, and on failure the reason plus a retry that calls the hook's `reload`.
+Screens that read from the database should render it rather than printing "Carregando…" forever.
 
 `AdjustModal` (cashing a player out) ships its own keypad instead of a text input, and does not
 close on a backdrop click. All three are scars from a real night: the iPhone numeric keyboard has
@@ -214,6 +280,10 @@ level (`baseBlind * 2^level`), and on zero it pauses and beeps (Web Audio `Oscil
 
 ### i18n
 
+A session is a **"jogo"** in the UI, never a "noite" — the group plays in the afternoon too. Code
+identifiers still say `night`/`nights` (`stats.js`, the `bestNight` keys); only user-facing text
+was renamed, and renaming the internals would be churn with no reader on the other end.
+
 `src/lib/i18n.js` holds three dictionaries (`pt`/`en`/`es`) and the locale resolution: the stored
 preference is `auto` (default), which follows `navigator.languages`, or a pinned code. Components
 read strings via `useI18n()`'s `t('area.key', { param })`; a missing key falls back to Portuguese
@@ -232,8 +302,19 @@ included) gets both without repeating state.
 ### Theming
 
 `useTheme` sets `document.documentElement.dataset.theme`, selecting a CSS custom-property palette
-in `src/index.css` (`[data-theme="..."]` blocks). Adding a theme requires both a `THEMES` entry in
-`useTheme.js` and a matching CSS block. The `pride` theme additionally has a block of rainbow
+in `src/index.css` (`[data-theme="..."]` blocks). Adding a theme requires a `THEMES` entry in
+`useTheme.js`, a matching CSS block, a `themes.<id>` string in all three dictionaries and a
+`.theme-swatch-<id>` rule.
+
+Surfaces go through variables, not raw rgba: `--surface` (the card itself), `--tint-1..5` (the
+film that gives chips and list rows relief), `--well`/`--well-deep` (recessed fields), `--dock`
+(the sticky action bar) and `--wood`/`--wood-dark` (the frame around a card). That indirection exists for the `light`
+theme, where a *light* film over a light page would simply vanish — there the tints invert to
+dark. The first attempt at the light theme missed `--surface` and `--wood`, and the result was
+dark text on cards that had stayed dark: when adding a theme, check the card, the frame and the
+dock, not just the page background. Anything hard-coded for a dark background gets an explicit override in the light block at
+the bottom of the file: the pastel win/loss colours, the modal veil, box shadows, the poker-chip
+gradients and the background suits. The `pride` theme additionally has a block of rainbow
 border/glow overrides at the bottom of `index.css`, driven by `--pride-arc` and `--pride-glow*`.
 
 ### PWA / offline support
@@ -264,8 +345,14 @@ from a raster icon; with an SVG-only icon set it installs a plain shortcut and s
 `tools/make-icons.ps1` (standalone, like `slice-cards.ps1`); rerun it and bump `CACHE` in `sw.js`
 if the artwork changes.
 
+### Bundle
+
+Only the every-night path ships in the main chunk: login, table list, the table, the settlement
+and the two public link screens. Everything else is `lazy()` behind a `Suspense` in `App.jsx`.
+Note that `@supabase/supabase-js` dominates the download either way — the split buys first-paint
+weight and cache granularity, not a small app.
+
 ### Card assets
 
 `public/cards/deck/` contains one PNG per playing card, named by rank+suit (e.g. `AS.png`,
-`10D.png`). `tools/slice-cards.ps1` is a standalone PowerShell script (not wired into npm scripts)
-that slices a full deck sprite sheet into these images — only needed when regenerating card art.
+`10D.png`). 

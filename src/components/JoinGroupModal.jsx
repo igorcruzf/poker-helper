@@ -38,6 +38,10 @@ export default function JoinGroupModal({ open, initialCode, onCancel, onFind, on
 
   if (!open) return null
 
+  const players = found?.players || []
+  const canPick = found && !found.notFound && !found.already_member && !found.pending
+  const canRequest = claim === '__new' ? claimName.trim().length > 0 : !!claim
+
   async function handleFind(e) {
     e.preventDefault()
     if (!code.trim()) return
@@ -51,6 +55,11 @@ export default function JoinGroupModal({ open, initialCode, onCancel, onFind, on
   }
 
   async function handleRequest() {
+    // Antes o botão só ficava apagado, e ninguém entendia o que faltava.
+    if (!canRequest) {
+      setError(t(claim === '__new' ? 'groups.pickNameFirst' : 'groups.pickPlayerFirst'))
+      return
+    }
     setBusy(true)
     setError('')
     const err = await onRequest({
@@ -61,10 +70,6 @@ export default function JoinGroupModal({ open, initialCode, onCancel, onFind, on
     setBusy(false)
     if (err) setError(err)
   }
-
-  const players = found?.players || []
-  const canPick = found && !found.notFound && !found.already_member && !found.pending
-  const canRequest = claim === '__new' ? claimName.trim().length > 0 : !!claim
 
   return (
     <div className="overlay">
@@ -87,8 +92,6 @@ export default function JoinGroupModal({ open, initialCode, onCancel, onFind, on
           </button>
         </form>
 
-        {error && <div className="auth-error">{error}</div>}
-
         {found?.notFound && <div className="empty-state">{t('groups.notFound')}</div>}
 
         {found && !found.notFound && found.already_member && (
@@ -107,7 +110,7 @@ export default function JoinGroupModal({ open, initialCode, onCancel, onFind, on
                 <button
                   key={p.id}
                   className={`theme-option${claim === p.id ? ' active' : ''}`}
-                  onClick={() => setClaim(p.id)}
+                  onClick={() => { setClaim(p.id); setError('') }}
                 >
                   <span className="theme-name">{p.name}</span>
                   {claim === p.id && <span className="theme-check">✓</span>}
@@ -115,7 +118,7 @@ export default function JoinGroupModal({ open, initialCode, onCancel, onFind, on
               ))}
               <button
                 className={`theme-option${claim === '__new' ? ' active' : ''}`}
-                onClick={() => setClaim('__new')}
+                onClick={() => { setClaim('__new'); setError('') }}
               >
                 <span className="theme-name">
                   {t('groups.iAmNew')}
@@ -124,6 +127,8 @@ export default function JoinGroupModal({ open, initialCode, onCancel, onFind, on
                 {claim === '__new' && <span className="theme-check">✓</span>}
               </button>
             </div>
+
+            {error && <div className="auth-error">{error}</div>}
 
             {claim === '__new' && (
               <label className="auth-field">
@@ -136,11 +141,7 @@ export default function JoinGroupModal({ open, initialCode, onCancel, onFind, on
               </label>
             )}
 
-            <button
-              className="add-player-btn"
-              onClick={handleRequest}
-              disabled={busy || !canRequest}
-            >
+            <button className="add-player-btn" onClick={handleRequest} disabled={busy}>
               {t('groups.sendRequest')}
             </button>
           </>

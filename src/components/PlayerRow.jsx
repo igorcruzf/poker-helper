@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { fmt, saldoClass, computeSaldo } from '../utils.js'
+import Avatar from './Avatar.jsx'
 import { useI18n } from '../hooks/useI18n.js'
 
 export default function PlayerRow({
@@ -9,6 +10,8 @@ export default function PlayerRow({
   onCacifeChange,
   onDelete,
   onOpenAdjust,
+  onOpenProfile,
+  photo,
   dragEnabled,
   onDragStart,
   onDragOver,
@@ -41,7 +44,20 @@ export default function PlayerRow({
       onDragEnd={dragEnabled ? onDragEnd : undefined}
     >
       <div className="chip-btn remove" onClick={() => onDelete(player)}>−</div>
-      <span className="player-name" title={player.name}>{player.name}</span>
+      {/* Foto + nome abrem a página da pessoa. Sem `onOpenProfile` (mesa
+          pública, por exemplo) fica só o texto, sem afordância de clique. */}
+      {onOpenProfile ? (
+        <button
+          className="player-name-btn"
+          onClick={() => onOpenProfile(player)}
+          title={t('table.openProfile', { name: player.name })}
+        >
+          <Avatar photo={photo} name={player.name} size="xs" />
+          <span className="player-name">{player.name}</span>
+        </button>
+      ) : (
+        <span className="player-name" title={player.name}>{player.name}</span>
+      )}
       <div className="stepper">
         <div
           className="chip-btn small"

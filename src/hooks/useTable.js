@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { reportResult, saveRow } from '../lib/syncQueue.js'
+import { useDebouncedSave } from './useDebouncedSave.js'
+import { usePlayerUndo } from './usePlayerUndo.js'
 import {
   EPS,
   balancePlayers,
@@ -49,13 +51,15 @@ export function useTable(tableId) {
   const [settlements, setSettlements] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [canUndo, setCanUndo] = useState(false)
 
   const playersRef = useRef([])
-  const buyInRef = useRef(0)
-  const past = useRef([])
-  const timers = useRef({})
-  const patches = useRef({})
+
+  // Persistir, desfazer e o estado da mesa são três assuntos separados; aqui
+  // ficou só o terceiro.
+  const { schedule: scheduleSave, flush: flushSaves } = useDebouncedSave()
+  const { canUndo, push: pushUndo, drop: dropUndo, undo } = usePlayerUndo({
+    tableId, playersRef, setPlayers, scheduleSave,
+  })
 
   const load = useCallback(async () => {
     if (!supabase || !tableId) return
@@ -73,7 +77,6 @@ export function useTable(tableId) {
     }
     const list = normalizePlayers(data.table_players)
     playersRef.current = list
-    buyInRef.current = Number(data.buy_in)
     setTable(data)
     setPlayers(list)
     setSettlements(data.settlements || [])
@@ -85,114 +88,10 @@ export function useTable(tableId) {
     load()
   }, [load])
 
-  // --- persistência -------------------------------------------------------
-
-  const scheduleSave = useCallback((tableName, id, patch, delay = 500) => {
-    const key = `${tableName}:${id}`
-    patches.current[key] = { ...(patches.current[key] || {}), ...patch }
-    clearTimeout(timers.current[key])
-    timers.current[key] = setTimeout(() => {
-      const body = patches.current[key]
-      delete patches.current[key]
-      delete timers.current[key]
-      if (body) saveRow(tableName, id, body)
-    }, delay)
-  }, [])
-
-  const flushSaves = useCallback(async () => {
-    const keys = Object.keys(patches.current)
-    await Promise.all(
-      keys.map((key) => {
-        clearTimeout(timers.current[key])
-        delete timers.current[key]
-        const body = patches.current[key]
-        delete patches.current[key]
-        const [tableName, id] = key.split(':')
-        return saveRow(tableName, id, body)
-      })
-    )
-  }, [])
-
-  useEffect(() => () => {
-    // Ao sair da tela, manda o que ainda estiver represado.
-    Object.keys(patches.current).forEach((key) => {
-      clearTimeout(timers.current[key])
-      const [tableName, id] = key.split(':')
-      saveRow(tableName, id, patches.current[key])
-    })
-    patches.current = {}
-    timers.current = {}
-  }, [])
-
-  // --- undo ---------------------------------------------------------------
-
-  function pushUndo() {
-    past.current.push({
-      players: playersRef.current.map((p) => ({ ...p })),
-      buyIn: buyInRef.current,
-    })
-    if (past.current.length > 40) past.current.shift()
-    setCanUndo(true)
-  }
-
   function applyPlayers(next, { undoable = true } = {}) {
     if (undoable) pushUndo()
     playersRef.current = next
     setPlayers(next)
-  }
-
-  async function undo() {
-    const prev = past.current.pop()
-    setCanUndo(past.current.length > 0)
-    if (!prev) return
-
-    const current = playersRef.current
-    playersRef.current = prev.players
-    setPlayers(prev.players)
-
-    const prevIds = new Set(prev.players.map((p) => p.id))
-    const currentIds = new Set(current.map((p) => p.id))
-
-    // Linhas que o undo traz de volta (desfazer uma exclusão).
-    const toInsert = prev.players.filter((p) => !currentIds.has(p.id))
-    if (toInsert.length > 0) {
-      await supabase.from('table_players').insert(
-        toInsert.map((p) => ({
-          id: p.id,
-          table_id: tableId,
-          player_id: p.player_id,
-          name: p.name,
-          cacifes: p.cacifes,
-          adjustment: p.adjustment,
-          position: p.position,
-        }))
-      )
-    }
-
-    // Linhas criadas depois do snapshot (desfazer uma inclusão).
-    const toDelete = current.filter((p) => !prevIds.has(p.id))
-    if (toDelete.length > 0) {
-      await supabase.from('table_players').delete().in('id', toDelete.map((p) => p.id))
-    }
-
-    // Linhas que existem dos dois lados mas mudaram.
-    prev.players.forEach((p) => {
-      const before = current.find((c) => c.id === p.id)
-      if (!before) return
-      if (
-        before.cacifes !== p.cacifes ||
-        before.adjustment !== p.adjustment ||
-        before.name !== p.name ||
-        before.position !== p.position
-      ) {
-        scheduleSave(
-          'table_players',
-          p.id,
-          { cacifes: p.cacifes, adjustment: p.adjustment, name: p.name, position: p.position },
-          0
-        )
-      }
-    })
   }
 
   // --- mutações -----------------------------------------------------------
@@ -213,8 +112,7 @@ export function useTable(tableId) {
     if (error) {
       setError(error.message)
       // Desfaz o otimismo e tira o passo da pilha: nunca existiu.
-      past.current.pop()
-      setCanUndo(past.current.length > 0)
+      dropUndo()
       applyPlayers(playersRef.current.filter((p) => p.id !== id), { undoable: false })
       return null
     }

@@ -101,11 +101,16 @@ sequer ver o nome do grupo, e cada uma confere o papel de quem chamou.
 **Authentication → URL Configuration**:
 
 - _Site URL_: `https://seu-app.vercel.app`
-- _Redirect URLs_: adicione `http://localhost:5173` (para desenvolvimento) e
-  `https://seu-app.vercel.app`. Se usa preview deploys da Vercel, adicione
-  também `https://*.vercel.app`.
+- _Redirect URLs_: adicione `http://localhost:5173` e `http://localhost:5173/nova-senha`
+  (desenvolvimento), mais `https://seu-app.vercel.app` e
+  `https://seu-app.vercel.app/nova-senha`. Se usa preview deploys da Vercel,
+  adicione também `https://*.vercel.app`.
 
-Sem isso o login com Google volta para o lugar errado depois de autenticar.
+Sem isso o login com Google volta para o lugar errado depois de autenticar. O
+`/nova-senha` é para onde aponta o link de "esqueci minha senha" — se ele não
+estiver na lista, o Supabase joga a pessoa na _Site URL_ e o app coloca a tela
+de trocar senha na frente do mesmo jeito, então nada quebra; só fica menos
+direto.
 
 ## 4. Variáveis de ambiente
 

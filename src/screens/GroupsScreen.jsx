@@ -6,11 +6,14 @@ import { useRoster } from '../hooks/useRoster.js'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { copyText, groupInviteUrlFor } from '../lib/summary.js'
 import AppChrome from '../components/AppChrome.jsx'
+import BackBar from '../components/BackBar.jsx'
+import ScreenStatus from '../components/ScreenStatus.jsx'
 import GroupImage from '../components/GroupImage.jsx'
 import GroupFormModal from '../components/GroupFormModal.jsx'
 import JoinGroupModal from '../components/JoinGroupModal.jsx'
 import GroupMembersModal from '../components/GroupMembersModal.jsx'
 import GroupRosterModal from '../components/GroupRosterModal.jsx'
+import EditRosterPlayerModal from '../components/EditRosterPlayerModal.jsx'
 import GroupRequestsModal from '../components/GroupRequestsModal.jsx'
 import PickPlayerModal from '../components/PickPlayerModal.jsx'
 import { useI18n } from '../hooks/useI18n.js'
@@ -24,13 +27,14 @@ export default function GroupsScreen() {
   const { t } = useI18n()
   const {
     groups, activeGroup, activeGroupId, isHost, isOwner, hasGroup, loading,
-    myMembershipId, myPlayerId,
+    myMembershipId, myPlayerId, myRequests, dropRequest,
     selectGroup, createGroup, updateGroup, setMyPlayer, findGroupByCode, requestJoin, leaveGroup,
+    error: groupsError, reload: reloadGroups,
   } = useGroups()
   // Membro comum também precisa da lista: é ela que diz quais jogadores já
   // têm dono na hora de se identificar. O RLS esconde dele só os pedidos.
   const admin = useGroupAdmin(activeGroupId)
-  const { roster } = useRoster()
+  const { roster, renameInRoster } = useRoster()
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -39,6 +43,8 @@ export default function GroupsScreen() {
   const [rosterOpen, setRosterOpen] = useState(false)
   const [requestsOpen, setRequestsOpen] = useState(false)
   const [pickFor, setPickFor] = useState(null)
+  const [editingPlayer, setEditingPlayer] = useState(null)
+  const [editError, setEditError] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -122,6 +128,17 @@ export default function GroupsScreen() {
     setError(known.includes(error.message) ? t(`groups.pickError.${error.message}`) : error.message)
   }
 
+  async function handleRenamePlayer(values) {
+    setEditError('')
+    const { error } = await renameInRoster(editingPlayer.id, values)
+    if (error) {
+      setEditError(error.message)
+      return
+    }
+    setEditingPlayer(null)
+    admin.reload()
+  }
+
   async function handleCopyInvite() {
     const ok = await copyText(groupInviteUrlFor(activeGroup.invite_code))
     setCopyLabel(ok ? t('common.copied') : t('common.copyFailed'))
@@ -148,10 +165,48 @@ export default function GroupsScreen() {
           subtitle={t('groups.eyebrow')}
         />
 
+        {hasGroup && <BackBar to="/" title={t('groups.eyebrow')} />}
+
         {message && <div className="sync-flag online">{message}</div>}
         {error && <div className="auth-error">{error}</div>}
 
-        {loading && <div className="empty-state">{t('common.loading')}</div>}
+        {(loading || groupsError) && (
+          <ScreenStatus loading={loading} error={groupsError} onRetry={reloadGroups} />
+        )}
+
+        {/* --- o que houve com o meu pedido ---
+            Quem pediu entrada não é membro, então não enxerga nem o nome do
+            grupo pelo RLS: sem este bloco a pessoa ficava sem retorno nenhum
+            entre pedir e ser aprovada. */}
+        {!loading && myRequests.length > 0 && (
+          <div className="rail">
+            <div className="card">
+              <div className="section-title">{t('groups.myRequests')}</div>
+              {myRequests.map((r) => (
+                <div className="request-item" key={r.id}>
+                  <div className="request-who">
+                    <strong>{r.group_name || t('groups.unnamedGroup')}</strong>
+                    <small>
+                      {r.status === 'pending'
+                        ? t('groups.requestPending')
+                        : t('groups.requestRejected')}
+                      {r.player_name ? ` · ${r.player_name}` : ''}
+                    </small>
+                  </div>
+                  <div className="request-actions">
+                    <button
+                      className="roster-del"
+                      title={r.status === 'pending' ? t('groups.requestCancel') : t('groups.requestDismiss')}
+                      onClick={() => dropRequest(r.id)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* --- meus grupos --- */}
         {!loading && (
@@ -305,9 +360,18 @@ export default function GroupsScreen() {
         open={rosterOpen}
         roster={roster}
         members={admin.members}
+        isHost={isHost}
+        onEdit={(p) => { setEditError(''); setEditingPlayer(p) }}
         // Com conta, a página é a da conta; sem conta, a do jogador visitante.
         onOpenPerson={(uid, pid) => navigate(uid ? `/perfil/${uid}` : `/jogador/${pid}`)}
         onClose={() => setRosterOpen(false)}
+      />
+
+      <EditRosterPlayerModal
+        player={editingPlayer}
+        error={editError}
+        onCancel={() => setEditingPlayer(null)}
+        onConfirm={handleRenamePlayer}
       />
 
       <GroupRequestsModal

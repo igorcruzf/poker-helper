@@ -6,6 +6,9 @@ const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
+  // Quem chega pelo link do e-mail de recuperação entra com sessão válida, mas
+  // precisa trocar a senha antes de qualquer outra coisa.
+  const [recovering, setRecovering] = useState(false)
 
   useEffect(() => {
     if (!supabase) {
@@ -19,9 +22,11 @@ export function AuthProvider({ children }) {
       setLoading(false)
     })
     // Mantém a sessão viva entre visitas e reage a login/logout em outra aba.
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
       setSession(next || null)
       setLoading(false)
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true)
+      if (event === 'SIGNED_OUT') setRecovering(false)
     })
     return () => {
       active = false
@@ -51,6 +56,16 @@ export function AuthProvider({ children }) {
         options: { redirectTo: window.location.origin },
       }),
     signOut: () => supabase.auth.signOut(),
+    // O link vai para /nova-senha. Se essa URL não estiver liberada no painel
+    // do Supabase, ele cai na Site URL e o evento PASSWORD_RECOVERY ainda
+    // coloca a tela de trocar senha na frente — por isso os dois caminhos.
+    resetPassword: (email) =>
+      supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/nova-senha`,
+      }),
+    updatePassword: (password) => supabase.auth.updateUser({ password }),
+    recovering,
+    endRecovery: () => setRecovering(false),
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

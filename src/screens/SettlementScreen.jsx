@@ -5,20 +5,24 @@ import { useTable } from '../hooks/useTable.js'
 import { settlementProgress } from '../lib/settlement.js'
 import { buildSummaryText, copyText, shareUrlFor } from '../lib/summary.js'
 import { computeSaldo, fmt, fmtDate, saldoClass } from '../utils.js'
-import { usePixKeys, pixByTablePlayer } from '../hooks/usePixKeys.js'
+import { useGroupPeople, pixByTablePlayer } from '../hooks/useGroupPeople.js'
 import ReopenTableModal from '../components/ReopenTableModal.jsx'
 import PixButton from '../components/PixButton.jsx'
 import AppChrome from '../components/AppChrome.jsx'
+import BackBar from '../components/BackBar.jsx'
+import ScreenStatus from '../components/ScreenStatus.jsx'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { useI18n } from '../hooks/useI18n.js'
 
 export default function SettlementScreen() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { table, players, settlements, buyIn, rebuy, loading, error, markPaid, reopenTable } = useTable(id)
+  const {
+    table, players, settlements, buyIn, rebuy, loading, error, markPaid, reopenTable, reload,
+  } = useTable(id)
   const { signOut, user } = useAuth()
   const { isHost, activeGroupId } = useGroups()
-  const pixKeys = usePixKeys(activeGroupId)
+  const people = useGroupPeople(activeGroupId)
   const { t } = useI18n()
   const [copyLabel, setCopyLabel] = useState(null)
   const [linkLabel, setLinkLabel] = useState(null)
@@ -31,22 +35,17 @@ export default function SettlementScreen() {
     if (table && !isHost) navigate(`/acerto/${table.share_token}`, { replace: true })
   }, [table, isHost, navigate])
 
-  if (loading) {
-    return (
-      <div className="app-shell">
-        <div className="app"><div className="empty-state">{t('settle.loading')}</div></div>
-      </div>
-    )
-  }
-
-  if (error || !table) {
+  if (loading || error || !table) {
     return (
       <div className="app-shell">
         <div className="app">
-          <div className="empty-state">{t('settle.loadFailed')}<br />{error}</div>
-          <div className="footer-actions">
-            <button className="add-player-btn" onClick={() => navigate('/')}>{t('settle.myTables')}</button>
-          </div>
+          <BackBar to="/" title={t('settle.myTables')} />
+          <ScreenStatus
+            loading={loading}
+            error={error || (!table && true)}
+            onRetry={reload}
+            message={t('settle.loading')}
+          />
         </div>
       </div>
     )
@@ -54,7 +53,19 @@ export default function SettlementScreen() {
 
   const nameOf = (tablePlayerId) =>
     players.find((p) => p.id === tablePlayerId)?.name || t('settle.removed')
-  const pix = pixByTablePlayer(players, pixKeys)
+  const pix = pixByTablePlayer(players, people.pixByPlayerId)
+
+  // O nome no acerto leva à página da pessoa. Quem saiu do elenco (player_id
+  // nulo) continua texto simples: não há para onde ir.
+  function personName(tablePlayerId) {
+    const seat = players.find((p) => p.id === tablePlayerId)
+    if (!seat) return t('settle.removed')
+    const route = people.routeFor(seat.player_id)
+    if (!route) return seat.name
+    return (
+      <button className="name-link" onClick={() => navigate(route)}>{seat.name}</button>
+    )
+  }
 
   const progress = settlementProgress(settlements)
   const ordered = [...settlements].sort((a, b) => Number(a.paid) - Number(b.paid))
@@ -101,6 +112,8 @@ export default function SettlementScreen() {
           subtitle={t('eyebrow.settlement')}
         />
 
+        <BackBar to="/" title={t('settle.myTables')} />
+
         <div className="rail">
           <div className="card">
             <div className="settle-head">
@@ -133,9 +146,9 @@ export default function SettlementScreen() {
                     />
                   </label>
                   <span className="settle-flow">
-                    <strong>{nameOf(s.from_table_player_id)}</strong>
+                    <strong>{personName(s.from_table_player_id)}</strong>
                     <span className="settle-arrow">{t('settle.paysTo')}</span>
-                    <strong>{nameOf(s.to_table_player_id)}</strong>
+                    <strong>{personName(s.to_table_player_id)}</strong>
                     <PixButton
                       pixKey={pix[s.to_table_player_id]}
                       name={nameOf(s.to_table_player_id)}
@@ -150,7 +163,7 @@ export default function SettlementScreen() {
             <div className="history-players">
               {balances.map((p) => (
                 <div className="history-player" key={p.id}>
-                  <span className="hp-name">{p.name} <small>({p.cacifes}x)</small></span>
+                  <span className="hp-name">{personName(p.id)} <small>({p.cacifes}x)</small></span>
                   <span className={`hp-saldo ${saldoClass(p.saldo)}`}>{fmt(p.saldo)}</span>
                 </div>
               ))}

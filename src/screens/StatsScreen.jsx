@@ -5,9 +5,11 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import { useGroups } from '../hooks/useGroups.jsx'
 import { useGroupAdmin } from '../hooks/useGroupAdmin.js'
 import { useRoster } from '../hooks/useRoster.js'
-import { computeOverview, computePlayerStats } from '../lib/stats.js'
+import { PERIODS, computeOverview, computePlayerStats, filterHistory } from '../lib/stats.js'
 import { fmt, fmtDate, saldoClass } from '../utils.js'
 import AppChrome from '../components/AppChrome.jsx'
+import BackBar from '../components/BackBar.jsx'
+import ScreenStatus from '../components/ScreenStatus.jsx'
 import { useI18n } from '../hooks/useI18n.js'
 
 const MEDALS = ['🥇', '🥈', '🥉']
@@ -43,11 +45,12 @@ export default function StatsScreen() {
   const navigate = useNavigate()
   const { user, signOut } = useAuth()
   const { activeGroup, activeGroupId } = useGroups()
-  const { finishedTables, loading } = useTables()
+  const { finishedTables, loading, error, reload } = useTables()
   const { roster } = useRoster()
   const admin = useGroupAdmin(activeGroupId)
   const { t } = useI18n()
   const [tableView, setTableView] = useState(false)
+  const [period, setPeriod] = useState('all')
 
   // O placar guarda o nome que estava na mesa naquela noite; daqui até a página
   // da pessoa o caminho é nome → jogador do elenco → conta (se houver). Sem
@@ -69,7 +72,7 @@ export default function StatsScreen() {
     return <button className="name-link" onClick={() => navigate(route)}>{name}</button>
   }
 
-  const history = tablesToHistory(finishedTables)
+  const history = filterHistory(tablesToHistory(finishedTables), period)
   const stats = computePlayerStats(history)
   const overview = computeOverview(history)
   const maxAbs = Math.max(0, ...stats.map((s) => Math.abs(s.totalSaldo)))
@@ -86,19 +89,39 @@ export default function StatsScreen() {
           subtitle={activeGroup ? `${t('eyebrow.stats')} · ${activeGroup.name}` : t('eyebrow.stats')}
         />
 
-        {loading && <div className="empty-state">{t('common.loading')}</div>}
+        <BackBar to="/" title={t('stats.title')} />
 
-        {!loading && stats.length === 0 && (
+        {(loading || error) && (
+          <ScreenStatus loading={loading} error={error} onRetry={reload} />
+        )}
+
+        {!loading && !error && (
+          <div className="filter-row period-row">
+            {PERIODS.map((id) => (
+              <button
+                key={id}
+                className={`filter-chip${period === id ? ' active' : ''}`}
+                onClick={() => setPeriod(id)}
+              >
+                {t(`stats.period.${id}`)}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!loading && !error && stats.length === 0 && (
           <div className="rail">
             <div className="card">
               <div className="empty-state">
-                {t('stats.empty')}<br />{t('stats.emptyHint')}
+                {period === 'all'
+                  ? <>{t('stats.empty')}<br />{t('stats.emptyHint')}</>
+                  : t('stats.emptyPeriod')}
               </div>
             </div>
           </div>
         )}
 
-        {!loading && stats.length > 0 && (
+        {!loading && !error && stats.length > 0 && (
           <>
             <div className="stat-tiles">
               <Tile label={t('stats.tables')} value={overview.tables} />
@@ -180,6 +203,8 @@ export default function StatsScreen() {
               </div>
             </div>
 
+            {/* Todo destaque de um jogo só carrega a data — sem ela o número
+                não diz nada além de existir. */}
             <div className="stat-tiles two">
               <Tile
                 label={t('stats.bestNight')}
@@ -195,8 +220,16 @@ export default function StatsScreen() {
               />
               <Tile
                 label={t('stats.mostCacifes')}
-                value={overview.mostCacifes.cacifes}
-                detail={overview.mostCacifes.name}
+                value={overview.mostCacifesGame.cacifes}
+                detail={`${overview.mostCacifesGame.name} · ${fmtDate(overview.mostCacifesGame.date)}`}
+              />
+              <Tile
+                label={t('stats.biggestGame')}
+                value={overview.biggestGame.cacifes}
+                detail={t('stats.biggestGameDetail', {
+                  count: overview.biggestGame.players,
+                  date: fmtDate(overview.biggestGame.date),
+                })}
               />
               <Tile
                 label={t('stats.mostPresent')}

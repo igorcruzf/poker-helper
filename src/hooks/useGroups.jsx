@@ -5,20 +5,24 @@ import { useAuth } from './useAuth.jsx'
 
 const GroupContext = createContext(null)
 
-const ACTIVE_KEY = 'poker-active-group'
+// Por conta, não por aparelho: duas pessoas que dividem o mesmo celular não
+// podem se jogar uma no grupo da outra ao trocar de login.
+function activeKey(userId) {
+  return `poker-active-group:${userId || 'anon'}`
+}
 
-function readActive() {
+function readActive(userId) {
   try {
-    return localStorage.getItem(ACTIVE_KEY) || null
+    return localStorage.getItem(activeKey(userId)) || null
   } catch {
     return null
   }
 }
 
-function writeActive(id) {
+function writeActive(userId, id) {
   try {
-    if (id) localStorage.setItem(ACTIVE_KEY, id)
-    else localStorage.removeItem(ACTIVE_KEY)
+    if (id) localStorage.setItem(activeKey(userId), id)
+    else localStorage.removeItem(activeKey(userId))
   } catch {
     /* modo privado: a escolha vale só para esta sessão */
   }
@@ -32,7 +36,26 @@ export function GroupProvider({ children }) {
   const [memberships, setMemberships] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [activeId, setActiveId] = useState(readActive)
+  const [activeId, setActiveId] = useState(null)
+  // Pedidos que a própria pessoa fez e ainda não viraram participação.
+  const [myRequests, setMyRequests] = useState([])
+
+  const loadMyRequests = useCallback(async () => {
+    if (!supabase || !user) {
+      setMyRequests([])
+      return
+    }
+    // O RLS já devolve só os pedidos desta conta. O nome do grupo vem gravado
+    // na linha porque quem ainda não é membro não enxerga a tabela de grupos.
+    const { data, error } = await supabase
+      .from('group_join_requests')
+      .select('id, group_id, group_name, status, player_name, created_at, decided_at')
+      .eq('user_id', user.id)
+      .in('status', ['pending', 'rejected'])
+      .order('created_at', { ascending: false })
+    reportResult(error)
+    if (!error) setMyRequests(data || [])
+  }, [user])
 
   const load = useCallback(async () => {
     if (!supabase || !user) {
@@ -66,7 +89,13 @@ export function GroupProvider({ children }) {
 
   useEffect(() => {
     load()
-  }, [load])
+    loadMyRequests()
+  }, [load, loadMyRequests])
+
+  // Ao abrir o app, o grupo que estava aberto da última vez volta sozinho.
+  useEffect(() => {
+    setActiveId(user ? readActive(user.id) : null)
+  }, [user])
 
   // Um grupo guardado que não existe mais (saiu, foi apagado) não pode travar o
   // app: cai no primeiro da lista.
@@ -78,14 +107,14 @@ export function GroupProvider({ children }) {
   useEffect(() => {
     if (active && active.group.id !== activeId) {
       setActiveId(active.group.id)
-      writeActive(active.group.id)
+      writeActive(user?.id, active.group.id)
     }
-  }, [active, activeId])
+  }, [active, activeId, user])
 
   const selectGroup = useCallback((id) => {
     setActiveId(id)
-    writeActive(id)
-  }, [])
+    writeActive(user?.id, id)
+  }, [user])
 
   async function createGroup(name) {
     const { data, error } = await supabase.rpc('create_group', { p_name: name })
@@ -113,7 +142,16 @@ export function GroupProvider({ children }) {
     })
     reportResult(error)
     if (error) return { data: null, error }
+    await loadMyRequests()
     return { data, error: null }
+  }
+
+  // Desistir de entrar, ou dar baixa num pedido recusado.
+  async function dropRequest(requestId) {
+    const { error } = await supabase.from('group_join_requests').delete().eq('id', requestId)
+    reportResult(error)
+    if (!error) await loadMyRequests()
+    return { error }
   }
 
   // Nome e foto do grupo: o RLS já deixa host editar a linha direto.
@@ -157,6 +195,8 @@ export function GroupProvider({ children }) {
     myMembershipId: active ? active.membershipId : null,
     myPlayerId: active ? active.playerId : null,
     hasGroup: memberships.length > 0,
+    myRequests,
+    dropRequest,
     loading,
     error,
     selectGroup,

@@ -1183,3 +1183,174 @@ as $$
 $$;
 
 grant execute on function public.find_group_by_code(text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 13. O pedido de entrada visto por quem pediu
+--     Quem pede acesso não é membro ainda, então o RLS de `groups` esconde até
+--     o nome do grupo — a pessoa ficava sem saber se o pedido foi enviado,
+--     aprovado ou recusado. Guardar o nome na própria linha do pedido resolve
+--     sem abrir a tabela de grupos para fora.
+-- ---------------------------------------------------------------------------
+alter table public.group_join_requests
+  add column if not exists group_name text;
+
+update public.group_join_requests r
+   set group_name = g.name
+  from public.groups g
+ where g.id = r.group_id
+   and r.group_name is null;
+
+create or replace function public.request_group_join(
+  p_code text,
+  p_player_id uuid,
+  p_player_name text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  g groups;
+begin
+  if auth.uid() is null then
+    raise exception 'sem sessão';
+  end if;
+
+  select * into g from groups where upper(invite_code) = upper(trim(p_code));
+  if g.id is null then
+    return jsonb_build_object('ok', false, 'reason', 'not_found');
+  end if;
+
+  if exists (select 1 from group_members m where m.group_id = g.id and m.user_id = auth.uid()) then
+    return jsonb_build_object('ok', false, 'reason', 'already_member');
+  end if;
+
+  if p_player_id is not null and not exists (
+    select 1 from players p where p.id = p_player_id and p.group_id = g.id
+  ) then
+    return jsonb_build_object('ok', false, 'reason', 'bad_player');
+  end if;
+
+  if p_player_id is null and nullif(trim(coalesce(p_player_name, '')), '') is null then
+    return jsonb_build_object('ok', false, 'reason', 'no_player');
+  end if;
+
+  insert into group_join_requests (group_id, group_name, user_id, email, player_id, player_name)
+  values (
+    g.id, g.name, auth.uid(),
+    (select u.email from auth.users u where u.id = auth.uid()),
+    p_player_id, nullif(trim(coalesce(p_player_name, '')), '')
+  )
+  on conflict (group_id, user_id) where status = 'pending'
+  do update set
+    group_name = excluded.group_name,
+    player_id = excluded.player_id,
+    player_name = excluded.player_name,
+    created_at = now();
+
+  return jsonb_build_object('ok', true, 'group_name', g.name);
+end;
+$$;
+
+grant execute on function public.request_group_join(text, uuid, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 14. Trocar de nome sem quebrar o histórico
+--     O nome do perfil e o nome na mesa eram duas coisas soltas: corrigir um
+--     deixava o outro velho, e o placar continuava somando pelo nome antigo.
+--     Esta função leva o nome novo para o jogador que a conta representa em
+--     TODOS os grupos e para todas as mesas já jogadas.
+--
+--     Como o nome é único por (grupo, nome, apelido), a mesma troca pode
+--     esbarrar num homônimo em um grupo e não em outro. Por isso ela valida
+--     tudo antes de gravar qualquer coisa: ou devolve a lista de grupos que
+--     precisam de apelido, ou aplica em todos. Nunca pela metade.
+-- ---------------------------------------------------------------------------
+create or replace function public.sync_my_player_name(p_name text, p_nicknames jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_name text := nullif(trim(coalesce(p_name, '')), '');
+  v_nicks jsonb := coalesce(p_nicknames, '{}'::jsonb);
+  m record;
+  v_nick text;
+  v_conflicts jsonb := '[]'::jsonb;
+  v_label text;
+begin
+  if auth.uid() is null then
+    raise exception 'sem sessão';
+  end if;
+  if v_name is null then
+    return jsonb_build_object('ok', false, 'reason', 'empty_name');
+  end if;
+
+  -- Passada 1: só olha. Junta os grupos em que o nome novo bateria em outro
+  -- jogador e o apelido oferecido não resolve.
+  for m in
+    select gm.group_id, gm.player_id, g.name as group_name, p.nickname as current_nickname
+    from group_members gm
+    join groups g on g.id = gm.group_id
+    join players p on p.id = gm.player_id
+    where gm.user_id = auth.uid() and gm.player_id is not null
+  loop
+    -- Apelido informado agora; sem ele, mantém o que a pessoa já usava.
+    v_nick := coalesce(
+      nullif(trim(coalesce(v_nicks ->> m.group_id::text, '')), ''),
+      m.current_nickname
+    );
+
+    if exists (
+      select 1 from players other
+      where other.group_id = m.group_id
+        and other.id <> m.player_id
+        and lower(trim(other.name)) = lower(v_name)
+        and lower(trim(coalesce(other.nickname, ''))) = lower(trim(coalesce(v_nick, '')))
+    ) then
+      v_conflicts := v_conflicts || jsonb_build_object(
+        'group_id', m.group_id,
+        'group_name', m.group_name,
+        'nickname', m.current_nickname
+      );
+    end if;
+  end loop;
+
+  if jsonb_array_length(v_conflicts) > 0 then
+    return jsonb_build_object('ok', false, 'reason', 'needs_nickname', 'conflicts', v_conflicts);
+  end if;
+
+  -- Passada 2: aplica. O rótulo com apelido é o que fica gravado na mesa, para
+  -- o histórico continuar separando dois homônimos.
+  for m in
+    select gm.group_id, gm.player_id, p.nickname as current_nickname
+    from group_members gm
+    join players p on p.id = gm.player_id
+    where gm.user_id = auth.uid() and gm.player_id is not null
+  loop
+    v_nick := coalesce(
+      nullif(trim(coalesce(v_nicks ->> m.group_id::text, '')), ''),
+      m.current_nickname
+    );
+
+    update players
+       set name = v_name,
+           nickname = nullif(trim(coalesce(v_nick, '')), '')
+     where id = m.player_id;
+
+    v_label := v_name || case
+      when nullif(trim(coalesce(v_nick, '')), '') is null then ''
+      else ' (' || trim(v_nick) || ')'
+    end;
+
+    update table_players set name = v_label where player_id = m.player_id;
+  end loop;
+
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+revoke all on function public.sync_my_player_name(text, jsonb) from public;
+grant execute on function public.sync_my_player_name(text, jsonb) to authenticated;

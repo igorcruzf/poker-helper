@@ -4,20 +4,32 @@ import { useTables } from '../hooks/useTables.js'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { useGroups } from '../hooks/useGroups.jsx'
 import { settlementProgress } from '../lib/settlement.js'
+import { pendingForPlayer } from '../lib/pending.js'
+import { useGroupPeople, pixByTablePlayer } from '../hooks/useGroupPeople.js'
 import { fmt, fmtDate } from '../utils.js'
 import AppChrome from '../components/AppChrome.jsx'
 import DeleteTableModal from '../components/DeleteTableModal.jsx'
+import PendingPayments from '../components/PendingPayments.jsx'
+import ScreenStatus from '../components/ScreenStatus.jsx'
 import { useI18n } from '../hooks/useI18n.js'
 
 export default function TablesScreen() {
   const navigate = useNavigate()
   const { user, signOut } = useAuth()
-  const { activeGroup, isHost, groups } = useGroups()
-  const { activeTables, finishedTables, loading, error, deleteTable } = useTables()
+  const { activeGroup, activeGroupId, isHost, groups, myPlayerId } = useGroups()
+  const people = useGroupPeople(activeGroupId)
+  const { activeTables, finishedTables, loading, error, deleteTable, reload } = useTables()
   const { t } = useI18n()
   const [deleting, setDeleting] = useState(null)
   const [onlyPending, setOnlyPending] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+
+  const pending = pendingForPlayer(finishedTables, myPlayerId)
+  // As chaves pix das mesas que têm dívida minha, para o botão de copiar.
+  const pixBySeat = finishedTables.reduce(
+    (acc, table) => Object.assign(acc, pixByTablePlayer(table.table_players || [], people.pixByPlayerId)),
+    {}
+  )
 
   const isPending = (table) => settlementProgress(table.settlements || []).pending > 0
   const pendingCount = finishedTables.filter(isPending).length
@@ -48,8 +60,18 @@ export default function TablesScreen() {
           subtitle={activeGroup?.name}
         />
 
-        {error && <div className="auth-error">{error}</div>}
         {deleteError && <div className="auth-error">{deleteError}</div>}
+
+        {(loading || error) && (
+          <ScreenStatus loading={loading} error={error} onRetry={reload} />
+        )}
+
+        <PendingPayments
+          pending={pending}
+          pix={pixBySeat}
+          isHost={isHost}
+          groupId={activeGroupId}
+        />
 
         {groups.length > 1 && (
           <button className="group-switch" onClick={() => navigate('/grupos')}>
@@ -97,8 +119,6 @@ export default function TablesScreen() {
         <div className="rail">
           <div className="card">
             <div className="section-title">{t('tables.previous')}</div>
-
-            {loading && <div className="empty-state">{t('common.loading')}</div>}
 
             {!loading && finishedTables.length > 0 && (
               <div className="filter-row">

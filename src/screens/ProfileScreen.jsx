@@ -1,16 +1,21 @@
-import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { useGroups } from '../hooks/useGroups.jsx'
 import { useGroupAdmin } from '../hooks/useGroupAdmin.js'
 import { useRoster } from '../hooks/useRoster.js'
 import { useProfile } from '../hooks/useProfile.js'
+import { markSetupOffered, useMyProfile } from '../hooks/useMyProfile.jsx'
 import { useTables, tablesToHistory } from '../hooks/useTables.js'
-import { computePlayerStats } from '../lib/stats.js'
+import { PERIODS, computeHeadToHead, computePlayerStats, filterHistory } from '../lib/stats.js'
 import { fmt, fmtDate, profileName, saldoClass } from '../utils.js'
 import AppChrome from '../components/AppChrome.jsx'
+import BackBar from '../components/BackBar.jsx'
+import ScreenStatus from '../components/ScreenStatus.jsx'
+import { useGoBack } from '../hooks/useGoBack.js'
 import Avatar from '../components/Avatar.jsx'
 import ProfileFormModal from '../components/ProfileFormModal.jsx'
+import NicknameConflictModal from '../components/NicknameConflictModal.jsx'
 import { useI18n } from '../hooks/useI18n.js'
 
 function Tile({ label, value, detail, tone }) {
@@ -29,7 +34,11 @@ function Tile({ label, value, detail, tone }) {
 // o visitante. O que manda nos números é sempre o jogador, não a conta.
 export default function ProfileScreen() {
   const { userId, playerId } = useParams()
+  const [params] = useSearchParams()
   const navigate = useNavigate()
+  const goBack = useGoBack()
+  // Conta nova chega aqui pela porta do App, com o modal já aberto.
+  const onboarding = params.get('novo') === '1'
   const { user, signOut } = useAuth()
   const { t } = useI18n()
   const { activeGroup, activeGroupId } = useGroups()
@@ -43,7 +52,14 @@ export default function ProfileScreen() {
     : null
   const targetUserId = playerId ? claimingMember?.user_id || null : userId || user?.id || null
 
-  const { profile, loading: profileLoading, isMine, save } = useProfile(targetUserId)
+  // O próprio perfil vem do provider (o mesmo que a porta do App consulta);
+  // o dos outros é buscado sob demanda.
+  const mine = useMyProfile()
+  const isMine = !!targetUserId && targetUserId === user?.id
+  const other = useProfile(isMine ? null : targetUserId)
+  const profile = isMine ? mine.profile : other.profile
+  const profileLoading = isMine ? mine.loading : other.loading
+  const save = mine.save
   const membership = targetUserId
     ? admin.members.find((m) => m.user_id === targetUserId) || null
     : null
@@ -54,9 +70,21 @@ export default function ProfileScreen() {
       ? { id: membership.player_id, name: membership.name }
       : null
 
-  const [editOpen, setEditOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(onboarding)
+
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [period, setPeriod] = useState('all')
+  // Grupos em que o nome novo bate num homônimo; a troca fica represada até a
+  // pessoa dar um apelido para cada um.
+  const [conflicts, setConflicts] = useState([])
+  const [pendingName, setPendingName] = useState('')
+
+  // Marca que o convite já foi feito assim que ele aparece — a porta do App não
+  // insiste de novo, mesmo que a pessoa saia sem preencher.
+  useEffect(() => {
+    if (onboarding && user?.id) markSetupOffered(user.id)
+  }, [onboarding, user])
 
   const resolving = admin.loading || rosterLoading || profileLoading
   // Visitante: joga nas mesas do grupo, mas ninguém no app é essa pessoa ainda.
@@ -64,7 +92,7 @@ export default function ProfileScreen() {
   const playerName = player?.name || null
   const displayName = profileName(profile) || playerName || t('profile.noName')
 
-  const history = tablesToHistory(finishedTables)
+  const history = filterHistory(tablesToHistory(finishedTables), period)
   const stats = playerName
     ? computePlayerStats(history).find(
         (s) => s.name.trim().toLowerCase() === playerName.trim().toLowerCase()
@@ -84,17 +112,57 @@ export default function ProfileScreen() {
     : []
   const best = nights.reduce((acc, n) => (!acc || n.entry.saldo > acc.entry.saldo ? n : acc), null)
   const worst = nights.reduce((acc, n) => (!acc || n.entry.saldo < acc.entry.saldo ? n : acc), null)
+  const headToHead = playerName ? computeHeadToHead(history, playerName) : []
 
   async function handleSave(values) {
     setBusy(true)
     setError('')
     const { error } = await save(values)
-    setBusy(false)
     if (error) {
+      setBusy(false)
       setError(error.message)
       return
     }
+
+    // O nome na mesa acompanha o do perfil — senão o placar continuaria somando
+    // pelo nome antigo.
+    const nextName = values.firstName.trim()
+    const changedName = nextName.toLowerCase() !== String(profile?.first_name || '').trim().toLowerCase()
+    if (changedName) {
+      const result = await mine.syncPlayerName(nextName, {})
+      if (result.conflicts.length > 0) {
+        setBusy(false)
+        setEditOpen(false)
+        setPendingName(nextName)
+        setConflicts(result.conflicts)
+        return
+      }
+      if (result.error) setError(result.error.message)
+      admin.reload()
+    }
+
+    setBusy(false)
     setEditOpen(false)
+    // Terminou o cadastro: segue para onde ia antes de ser desviada para cá.
+    if (onboarding) goBack()
+  }
+
+  async function handleResolveConflicts(nicknames) {
+    setBusy(true)
+    setError('')
+    const result = await mine.syncPlayerName(pendingName, nicknames)
+    setBusy(false)
+    if (result.error) {
+      setError(result.error.message)
+      return
+    }
+    if (result.conflicts.length > 0) {
+      setConflicts(result.conflicts)
+      return
+    }
+    setConflicts([])
+    admin.reload()
+    if (onboarding) goBack()
   }
 
   const hasSubject = !!profile || !!player
@@ -111,14 +179,15 @@ export default function ProfileScreen() {
           subtitle={t('profile.eyebrow')}
         />
 
-        <div className="screen-top">
-          <button className="back-link" onClick={() => navigate(-1)}>{t('common.back')}</button>
-          <span className="screen-title">{t('profile.eyebrow')}</span>
-        </div>
+        <BackBar title={t('profile.eyebrow')} />
+
+        {onboarding && <div className="sync-flag">{t('profile.welcome')}</div>}
 
         {error && <div className="auth-error">{error}</div>}
 
-        {resolving && <div className="empty-state">{t('common.loading')}</div>}
+        {(resolving || admin.error) && (
+          <ScreenStatus loading={resolving} error={admin.error} onRetry={admin.reload} />
+        )}
 
         {!resolving && !hasSubject && (
           <div className="rail">
@@ -161,6 +230,18 @@ export default function ProfileScreen() {
               <div className="card">
                 <div className="section-title">
                   {t('profile.statsIn', { group: activeGroup?.name || '' })}
+                </div>
+
+                <div className="filter-row period-row">
+                  {PERIODS.map((id) => (
+                    <button
+                      key={id}
+                      className={`filter-chip${period === id ? ' active' : ''}`}
+                      onClick={() => setPeriod(id)}
+                    >
+                      {t(`stats.period.${id}`)}
+                    </button>
+                  ))}
                 </div>
 
                 {tablesLoading && <div className="empty-state">{t('common.loading')}</div>}
@@ -208,6 +289,29 @@ export default function ProfileScreen() {
                       )}
                     </div>
 
+                    {headToHead.length > 0 && (
+                      <>
+                        <div className="section-title">{t('profile.headToHead')}</div>
+                        <p className="modal-hint">{t('profile.headToHeadHint')}</p>
+                        <div className="h2h-list">
+                          {headToHead.map((h) => (
+                            <div className="h2h-row" key={h.name}>
+                              <span className="h2h-name">{h.name}</span>
+                              <span className="h2h-record">
+                                <strong>{h.ahead}</strong>
+                                <span className="h2h-sep">×</span>
+                                <strong>{h.behind}</strong>
+                                <small>{t('profile.inNights', { count: h.nights })}</small>
+                              </span>
+                              <span className={`h2h-saldo ${saldoClass(h.mySaldo)}`}>
+                                {fmt(h.mySaldo)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
                     <div className="section-title">{t('profile.byNight')}</div>
                     <div className="history-players">
                       {[...nights].sort((a, b) => b.date - a.date).map((n) => (
@@ -228,6 +332,15 @@ export default function ProfileScreen() {
           </>
         )}
       </div>
+
+      <NicknameConflictModal
+        open={conflicts.length > 0}
+        name={pendingName}
+        conflicts={conflicts}
+        busy={busy}
+        onCancel={() => setConflicts([])}
+        onConfirm={handleResolveConflicts}
+      />
 
       <ProfileFormModal
         open={editOpen}

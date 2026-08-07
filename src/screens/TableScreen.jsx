@@ -8,11 +8,13 @@ import { useGroups } from '../hooks/useGroups.jsx'
 import { useModals } from '../hooks/useModals.js'
 import { useSortedPlayers } from '../hooks/useSortedPlayers.js'
 import { useDragReorder } from '../hooks/useDragReorder.js'
-import { usePixKeys, pixByTablePlayer } from '../hooks/usePixKeys.js'
+import { useGroupPeople, pixByTablePlayer } from '../hooks/useGroupPeople.js'
 import { buildSummaryText, copyText, liveUrlFor, shareUrlFor } from '../lib/summary.js'
 import { useI18n } from '../hooks/useI18n.js'
 
 import AppChrome from '../components/AppChrome.jsx'
+import BackBar from '../components/BackBar.jsx'
+import ScreenStatus from '../components/ScreenStatus.jsx'
 import BuyInRow from '../components/BuyInRow.jsx'
 import PlayerRow from '../components/PlayerRow.jsx'
 import TotalRow from '../components/TotalRow.jsx'
@@ -32,12 +34,12 @@ export default function TableScreen() {
   const {
     table, players, buyIn, rebuy, total, loading, error,
     addPlayer, changeCacife, deletePlayer, adjustPlayer, reorderPlayers,
-    previewSettlement, endGame, undo, canUndo, saveTimerState,
+    previewSettlement, endGame, undo, canUndo, saveTimerState, reload,
   } = useTable(id)
 
   const { t } = useI18n()
   const { isHost, activeGroupId } = useGroups()
-  const pixKeys = usePixKeys(activeGroupId)
+  const people = useGroupPeople(activeGroupId)
   const timer = useBlindsTimer(saveTimerState)
   const timeBank = useTimeBank()
   const {
@@ -78,7 +80,7 @@ export default function TableScreen() {
         settlementMode: table.settlement_mode,
         rebuy,
         collectorId: previewSettlement(balanceMode).collectorId,
-        pix: pixByTablePlayer(players, pixKeys),
+        pix: pixByTablePlayer(players, people.pixByPlayerId),
         shareUrl: withLink ? shareUrlFor(table.share_token) : '',
       })
     )
@@ -88,22 +90,12 @@ export default function TableScreen() {
     if (!error) navigate(`/mesa/${id}/acerto`, { replace: true })
   }
 
-  if (loading) {
-    return (
-      <div className="app-shell">
-        <div className="app"><div className="empty-state">{t('common.loading')}</div></div>
-      </div>
-    )
-  }
-
-  if (error || !table) {
+  if (loading || error || !table) {
     return (
       <div className="app-shell">
         <div className="app">
-          <div className="empty-state">{t('table.loadFailed')}<br />{error}</div>
-          <div className="footer-actions">
-            <button className="add-player-btn" onClick={() => navigate('/')}>{t('settle.myTables')}</button>
-          </div>
+          <BackBar to="/" title={t('settle.myTables')} />
+          <ScreenStatus loading={loading} error={error || (!table && true)} onRetry={reload} />
         </div>
       </div>
     )
@@ -120,6 +112,8 @@ export default function TableScreen() {
           subtitle={table.name}
           onShare={() => setShareOpen(true)}
         />
+
+        <BackBar to="/" title={t('settle.myTables')} />
 
         {timer.active && (
           <button
@@ -188,6 +182,11 @@ export default function TableScreen() {
                   onCacifeChange={changeCacife}
                   onDelete={setDeletingPlayer}
                   onOpenAdjust={setAdjustingPlayer}
+                  photo={people.byPlayerId[p.player_id]?.photo}
+                  onOpenProfile={(pl) => {
+                    const route = people.routeFor(pl.player_id)
+                    if (route) navigate(route)
+                  }}
                   dragEnabled={dragEnabled}
                   onDragStart={handleDragStart}
                   onDragOver={handleDragOver}

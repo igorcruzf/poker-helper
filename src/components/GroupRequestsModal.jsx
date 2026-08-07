@@ -15,16 +15,20 @@ export default function GroupRequestsModal({ open, requests, loading, isOwner, a
           <div className="empty-state">{t('groups.noRequests')}</div>
         )}
 
+        {/* Nome, e-mail e botões em linhas próprias. Lado a lado, o e-mail —
+            que é longo — espremia os botões e quebrava no meio. */}
         {requests.map((r) => (
-          <div className="request-item" key={r.id}>
-            <div className="request-who">
+          <div className="request-card" key={r.id}>
+            <div className="request-head">
               <strong>{r.claimedName || t('groups.unnamed')}</strong>
-              <small>
-                {r.email}
-                {r.isNewPlayer ? ` · ${t('groups.newPlayer')}` : ` · ${t('groups.existingPlayer')}`}
-              </small>
+              <span className={`request-tag${r.isNewPlayer ? ' new' : ''}`}>
+                {r.isNewPlayer ? t('groups.newPlayer') : t('groups.existingPlayer')}
+              </span>
             </div>
-            <div className="request-actions">
+
+            <span className="request-email">{r.email}</span>
+
+            <div className="request-buttons">
               <button className="roster-add-btn" onClick={() => admin.approve(r.id, 'member')}>
                 {t('groups.approve')}
               </button>
@@ -35,8 +39,8 @@ export default function GroupRequestsModal({ open, requests, loading, isOwner, a
                   {t('groups.approveHost')}
                 </button>
               )}
-              <button className="roster-del" title={t('groups.reject')} onClick={() => admin.reject(r.id)}>
-                ✕
+              <button className="request-reject" onClick={() => admin.reject(r.id)}>
+                {t('groups.reject')}
               </button>
             </div>
           </div>

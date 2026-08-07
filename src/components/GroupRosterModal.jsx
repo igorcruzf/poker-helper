@@ -5,7 +5,7 @@ import { useI18n } from '../hooks/useI18n.js'
 // O elenco do grupo com a conta por trás de cada nome. Todo mundo tem página e
 // estatísticas — quem ainda não tem conta no app entra como "visitante", até
 // alguém assumir aquele jogador.
-export default function GroupRosterModal({ open, roster, members, onOpenPerson, onClose }) {
+export default function GroupRosterModal({ open, roster, members, isHost, onEdit, onOpenPerson, onClose }) {
   const { t } = useI18n()
   if (!open) return null
 
@@ -26,20 +26,33 @@ export default function GroupRosterModal({ open, roster, members, onOpenPerson, 
             const member = memberByPlayer[p.id]
             const name = profileName(member?.profile)
             return (
-              <button
-                key={p.id}
-                className="person-row"
-                onClick={() => onOpenPerson(member?.user_id || null, p.id)}
-              >
-                <Avatar photo={member?.profile?.photo} name={name || p.label} size="sm" />
-                <span className="person-text">
-                  <strong>{p.label}</strong>
-                  {member
-                    ? <small>{name || t('profile.noName')}</small>
-                    : <small className="visitor-tag">{t('profile.visitor')}</small>}
-                </span>
-                <span className="person-cta">→</span>
-              </button>
+              // Botão dentro de botão é HTML inválido, então o ✎ é irmão da
+              // linha, não filho dela.
+              <div className="roster-person" key={p.id}>
+                <button
+                  className="person-row bare"
+                  onClick={() => onOpenPerson(member?.user_id || null, p.id)}
+                >
+                  <Avatar photo={member?.profile?.photo} name={name || p.label} size="sm" />
+                  <span className="person-text">
+                    <strong>{p.label}</strong>
+                    {member
+                      ? <small>{name || t('profile.noName')}</small>
+                      : <small className="visitor-tag">{t('profile.visitor')}</small>}
+                  </span>
+                </button>
+                {/* Só o visitante é editável aqui: quem tem conta muda o
+                    nome no próprio perfil, e a mudança desce para os grupos. */}
+                {isHost && !member && (
+                  <button
+                    className="roster-add-btn"
+                    title={t('create.editRosterTitle', { name: p.label })}
+                    onClick={() => onEdit(p)}
+                  >
+                    ✎
+                  </button>
+                )}
+              </div>
             )
           })}
         </div>

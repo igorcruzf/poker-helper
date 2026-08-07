@@ -1,17 +1,24 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useGroups } from '../hooks/useGroups.jsx'
+import { useGroupPeople } from '../hooks/useGroupPeople.js'
 import { useRoster } from '../hooks/useRoster.js'
 import { useTables } from '../hooks/useTables.js'
 import { parseMoney } from '../utils.js'
+import Avatar from '../components/Avatar.jsx'
+import BackBar from '../components/BackBar.jsx'
 import DeleteRosterPlayerModal from '../components/DeleteRosterPlayerModal.jsx'
+import EditRosterPlayerModal from '../components/EditRosterPlayerModal.jsx'
 import { useI18n } from '../hooks/useI18n.js'
 
 const DEFAULT_BUYIN = 5
 
 export default function CreateTableScreen() {
   const navigate = useNavigate()
-  const { roster, loading: rosterLoading, addToRoster, removeFromRoster } = useRoster()
+  const { roster, loading: rosterLoading, addToRoster, renameInRoster, removeFromRoster } = useRoster()
   const { createTable } = useTables()
+  const { activeGroupId } = useGroups()
+  const people = useGroupPeople(activeGroupId)
   const { t } = useI18n()
 
   const [name, setName] = useState('')
@@ -27,6 +34,9 @@ export default function CreateTableScreen() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [deletingRoster, setDeletingRoster] = useState(null)
+  const [editingRoster, setEditingRoster] = useState(null)
+  const [editBusy, setEditBusy] = useState(false)
+  const [editError, setEditError] = useState('')
 
   const selectedPlayers = selected
     .map((id) => roster.find((p) => p.id === id))
@@ -57,6 +67,19 @@ export default function CreateTableScreen() {
     setNewName('')
     setNickname('')
     setSelected((prev) => (prev.includes(data.id) ? prev : [...prev, data.id]))
+  }
+
+  async function handleRenameRoster(values) {
+    setEditBusy(true)
+    setEditError('')
+    const { error } = await renameInRoster(editingRoster.id, values)
+    setEditBusy(false)
+    if (error) {
+      // Colisão com outro jogador do elenco cai aqui: nome + apelido são únicos.
+      setEditError(error.message)
+      return
+    }
+    setEditingRoster(null)
   }
 
   async function handleDeleteRoster() {
@@ -96,10 +119,7 @@ export default function CreateTableScreen() {
   return (
     <div className="app-shell">
       <div className="app">
-        <div className="screen-top">
-          <button className="back-link" onClick={() => navigate('/')}>{t('common.back')}</button>
-          <span className="screen-title">{t('create.title')}</span>
-        </div>
+        <BackBar to="/" title={t('create.title')} />
 
         <div className="rail">
           <div className="card">
@@ -156,8 +176,29 @@ export default function CreateTableScreen() {
                 >
                   <button className="roster-pick" onClick={() => toggle(p.id)}>
                     <span className="roster-check">{selected.includes(p.id) ? '✓' : ''}</span>
+                    <Avatar photo={people.byPlayerId[p.id]?.photo} name={p.label} size="xs" />
                     <span className="roster-name">{p.label}</span>
                   </button>
+                  {/* Quem tem conta muda o próprio nome no perfil — daqui só se
+                      abre a página da pessoa. O ✎ fica para o visitante, que
+                      não tem ninguém para editá-lo. */}
+                  {people.byPlayerId[p.id] ? (
+                    <button
+                      className="roster-del roster-open"
+                      title={t('create.openProfileTitle', { name: p.label })}
+                      onClick={() => navigate(people.routeFor(p.id))}
+                    >
+                      →
+                    </button>
+                  ) : (
+                    <button
+                      className="roster-del roster-edit"
+                      title={t('create.editRosterTitle', { name: p.label })}
+                      onClick={() => { setEditError(''); setEditingRoster(p) }}
+                    >
+                      ✎
+                    </button>
+                  )}
                   <button
                     className="roster-del"
                     title={t('create.deleteRosterTitle', { name: p.label })}
@@ -272,6 +313,14 @@ export default function CreateTableScreen() {
           </button>
         </div>
       </div>
+
+      <EditRosterPlayerModal
+        player={editingRoster}
+        busy={editBusy}
+        error={editError}
+        onCancel={() => setEditingRoster(null)}
+        onConfirm={handleRenameRoster}
+      />
 
       <DeleteRosterPlayerModal
         player={deletingRoster}
