@@ -1,8 +1,27 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { setLocalePref, translate } from './i18n.js'
+import { DICT, SUPPORTED, setLocalePref, translate } from './i18n.js'
 import { fmt } from '../utils.js'
 
 afterEach(() => setLocalePref('auto'))
+
+function flatten(obj, prefix = '') {
+  return Object.entries(obj).flatMap(([key, value]) => {
+    const path = prefix ? `${prefix}.${key}` : key
+    return value && typeof value === 'object' ? flatten(value, path) : [path]
+  })
+}
+
+// Faltar uma chave não quebra a tela (cai no português), mas some com a
+// tradução sem ninguém perceber. Aqui a gaveta que ficou para trás aparece.
+describe('os três dicionários têm as mesmas chaves', () => {
+  const base = flatten(DICT.pt).sort()
+
+  SUPPORTED.filter((locale) => locale !== 'pt').forEach((locale) => {
+    it(`${locale} cobre tudo que o pt tem, e nada a mais`, () => {
+      expect(flatten(DICT[locale]).sort()).toEqual(base)
+    })
+  })
+})
 
 describe('translate', () => {
   it('devolve a string do idioma pedido', () => {
@@ -17,7 +36,7 @@ describe('translate', () => {
   })
 
   it('deixa o marcador quando falta o parâmetro', () => {
-    expect(translate('pt', 'table.offline')).toContain('{count}')
+    expect(translate('pt', 'sync.pending')).toContain('{count}')
   })
 
   it('cai no português quando a chave falta no idioma', () => {

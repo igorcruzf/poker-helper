@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useGroups } from '../hooks/useGroups.jsx'
 import { useTable } from '../hooks/useTable.js'
 import { settlementProgress } from '../lib/settlement.js'
 import { buildSummaryText, copyText, shareUrlFor } from '../lib/summary.js'
 import { computeSaldo, fmt, fmtDate, saldoClass } from '../utils.js'
+import { usePixKeys, pixByTablePlayer } from '../hooks/usePixKeys.js'
 import ReopenTableModal from '../components/ReopenTableModal.jsx'
+import PixButton from '../components/PixButton.jsx'
 import AppChrome from '../components/AppChrome.jsx'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { useI18n } from '../hooks/useI18n.js'
@@ -14,11 +17,19 @@ export default function SettlementScreen() {
   const navigate = useNavigate()
   const { table, players, settlements, buyIn, rebuy, loading, error, markPaid, reopenTable } = useTable(id)
   const { signOut, user } = useAuth()
+  const { isHost, activeGroupId } = useGroups()
+  const pixKeys = usePixKeys(activeGroupId)
   const { t } = useI18n()
   const [copyLabel, setCopyLabel] = useState(null)
   const [linkLabel, setLinkLabel] = useState(null)
   const [reopenOpen, setReopenOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+
+  // Membro sem crachá de host lê o acerto pela tela pública, que já sabe lidar
+  // com quem só pode marcar o próprio pagamento.
+  useEffect(() => {
+    if (table && !isHost) navigate(`/acerto/${table.share_token}`, { replace: true })
+  }, [table, isHost, navigate])
 
   if (loading) {
     return (
@@ -43,6 +54,7 @@ export default function SettlementScreen() {
 
   const nameOf = (tablePlayerId) =>
     players.find((p) => p.id === tablePlayerId)?.name || t('settle.removed')
+  const pix = pixByTablePlayer(players, pixKeys)
 
   const progress = settlementProgress(settlements)
   const ordered = [...settlements].sort((a, b) => Number(a.paid) - Number(b.paid))
@@ -56,6 +68,7 @@ export default function SettlementScreen() {
         withSettlement: true,
         settlementMode: table.settlement_mode,
         rebuy,
+        pix,
         shareUrl: shareUrlFor(table.share_token),
       })
     )
@@ -123,6 +136,10 @@ export default function SettlementScreen() {
                     <strong>{nameOf(s.from_table_player_id)}</strong>
                     <span className="settle-arrow">{t('settle.paysTo')}</span>
                     <strong>{nameOf(s.to_table_player_id)}</strong>
+                    <PixButton
+                      pixKey={pix[s.to_table_player_id]}
+                      name={nameOf(s.to_table_player_id)}
+                    />
                   </span>
                   <span className="settle-amount">{fmt(s.amount)}</span>
                 </div>

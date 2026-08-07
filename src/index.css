@@ -258,7 +258,7 @@ h1 .suit.red{ color: var(--red-bright); }
 
 .col-labels{
   display:grid;
-  grid-template-columns: 26px 1fr 78px 92px;
+  grid-template-columns: 26px 1fr 70px 104px;
   gap: 8px;
   font-size:11px;
   color: var(--cream-dim);
@@ -274,7 +274,7 @@ h1 .suit.red{ color: var(--red-bright); }
 .players{ display:flex; flex-direction:column; gap: 10px; }
 .player-row{
   display:grid;
-  grid-template-columns: 26px 1fr 78px 92px;
+  grid-template-columns: 26px 1fr 70px 104px;
   gap: 8px;
   align-items:center;
   background: rgba(241,233,216,0.05);
@@ -325,7 +325,27 @@ h1 .suit.red{ color: var(--red-bright); }
   font-family:'IBM Plex Mono', monospace;
   font-size:13px; font-weight:600; min-width: 14px; text-align:center;
 }
-.saldo-stepper{ display:flex; align-items:center; justify-content:flex-end; gap:5px; }
+.saldo-btn{
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+  width:100%;
+  background: rgba(241,233,216,0.07);
+  border: 1px solid var(--gold);
+  border-radius: 10px;
+  padding: 4px 6px;
+  cursor:pointer;
+  color: inherit;
+  font-family:'Inter', sans-serif;
+  transition: transform 0.12s ease;
+}
+.saldo-btn:active{ transform: scale(0.95); }
+.saldo-btn-hint{
+  font-size: 9px;
+  text-transform:uppercase;
+  letter-spacing: 0.07em;
+  color: var(--gold-bright);
+  white-space:nowrap;
+  line-height:1;
+}
 .saldo-value{
   font-family:'IBM Plex Mono', monospace;
   font-size: clamp(10px, 3.1vw, 13px);
@@ -413,7 +433,11 @@ h1 .suit.red{ color: var(--red-bright); }
   padding: 24px;
   z-index: 70;
   animation: overlay-fade 0.2s ease;
+  /* `margin:auto` no filho centraliza enquanto couber e deixa rolar quando não
+     couber — com `align-items:center` sozinho o topo do modal ficaria cortado. */
+  overflow-y: auto;
 }
+.overlay > .modal{ margin: auto; }
 .modal{
   background: linear-gradient(180deg, var(--felt-light), var(--felt));
   border: 1px solid var(--line);
@@ -466,6 +490,66 @@ h1 .suit.red{ color: var(--red-bright); }
   margin: -2px 0 14px;
   padding: 0 2px;
 }
+/* Modal de saldo: teclado próprio, então nada de campo de texto nem do
+   teclado do sistema cobrindo o confirmar. */
+.adjust-modal{ padding: 22px 18px 18px; }
+.adjust-line{
+  display:flex; justify-content:space-between; align-items:baseline;
+  font-size: 13px; color: var(--cream-dim);
+  padding: 0 4px 6px;
+}
+.adjust-line.final{ padding-top: 12px; font-size: 14px; }
+.adjust-line-value{
+  font-family:'IBM Plex Mono', monospace;
+  font-size: 15px; font-weight:600; color: var(--cream);
+}
+.adjust-display{
+  display:flex; flex-direction:column; align-items:center; gap: 2px;
+  background: rgba(18,41,34,0.55);
+  border: 1px solid var(--gold);
+  border-radius: 12px;
+  padding: 10px 12px 12px;
+  margin-bottom: 12px;
+}
+.adjust-display-label{
+  font-size: 10px; text-transform:uppercase; letter-spacing:0.08em;
+  color: var(--cream-dim);
+}
+.adjust-display-value{
+  font-family:'IBM Plex Mono', monospace;
+  font-size: 28px; font-weight:600; color: var(--gold-bright);
+  line-height:1.1;
+}
+.keypad{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.keypad-key{
+  background: rgba(241,233,216,0.07);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--cream);
+  font-family:'IBM Plex Mono', monospace;
+  font-size: 20px; font-weight:600;
+  padding: 12px 0;
+  cursor:pointer;
+  transition: transform 0.1s ease, background 0.15s ease;
+  user-select:none;
+}
+.keypad-key:active{ transform: scale(0.94); background: rgba(241,233,216,0.16); }
+.keypad-key.erase, .keypad-key.sign{ color: var(--gold-bright); font-size: 18px; }
+.keypad-key.sign.active{
+  border-color: var(--red-bright);
+  color: #f3b3b0;
+  background: rgba(179,58,58,0.18);
+}
+@media (max-height: 700px){
+  .keypad-key{ padding: 9px 0; font-size: 18px; }
+  .adjust-display-value{ font-size: 24px; }
+  .adjust-modal .modal-hint{ display:none; }
+}
+
 .modal-actions{ display:flex; justify-content:center; gap: 26px; margin-top: 20px; }
 .round-action{
   width: 46px; height:46px; border-radius:50%;
@@ -475,6 +559,8 @@ h1 .suit.red{ color: var(--red-bright); }
 .round-action:active{ transform: scale(0.9); }
 .round-action.cancel{ border-color: var(--red); color:#e8a3a3; }
 .round-action.confirm{ border-color:#a3d9b1; color:#a3d9b1; }
+.round-action.disabled{ opacity: 0.4; cursor: not-allowed; }
+.round-action.disabled:active{ transform: none; }
 
 .share-text{
   text-align:left;
@@ -952,6 +1038,234 @@ h1 .suit.red{ color: var(--red-bright); }
   color: var(--gold-bright);
   margin: 16px 0 8px; text-align:left;
 }
+/* ===========================================================================
+   Grupos
+   =========================================================================== */
+.group-switch{
+  width:100%;
+  background: rgba(241,233,216,0.06);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px; margin-bottom: 10px;
+  color: var(--cream-dim);
+  font-family:'Inter', sans-serif; font-size: 12.5px;
+  cursor:pointer; text-align:left;
+}
+.group-switch:hover{ color: var(--cream); border-color: var(--gold); }
+
+.group-list{ display:flex; flex-direction:column; gap: 8px; }
+.group-card{
+  display:flex; align-items:center; gap: 12px;
+  width:100%; text-align:left;
+  padding: 8px 12px 8px 8px;
+  background: rgba(241,233,216,0.05);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--cream);
+  font-family:'Inter', sans-serif;
+  cursor:pointer;
+}
+.group-card.active{ border-color: var(--gold-bright); background: rgba(241,233,216,0.10); }
+.group-avatar{
+  width: 46px; height: 46px; flex-shrink:0;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  background: var(--felt-dark);
+}
+.group-card-text{ display:flex; flex-direction:column; gap: 2px; min-width:0; flex:1; }
+.group-card-text strong{ font-size: 15px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.group-card-text small{ font-size: 11.5px; color: var(--cream-dim); }
+
+.group-cover{
+  width:100%; height: 108px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  margin-bottom: 12px;
+  display:block;
+  background: var(--felt-dark);
+}
+
+.group-head{ display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 10px; }
+.group-head-name{ font-family:'Fraunces', serif; font-size: 19px; font-weight:600; }
+.group-edit{
+  background:none; border:none; color: var(--gold-bright);
+  cursor:pointer; font-size: 16px; padding: 2px 6px; flex-shrink:0;
+}
+
+.group-buttons{ display:flex; gap: 8px; flex-wrap:wrap; margin-top: 10px; }
+.group-buttons .roster-add-btn{ flex:1; min-width: 120px; }
+
+/* Qual jogador do elenco sou eu neste grupo. */
+.my-player{
+  display:flex; align-items:center; gap: 8px; flex-wrap:wrap;
+  width:100%; text-align:left;
+  padding: 10px 12px;
+  background: rgba(18,41,34,0.5);
+  border: 1px solid var(--gold);
+  border-radius: 10px;
+  color: var(--cream);
+  font-family:'Inter', sans-serif;
+  cursor:pointer;
+}
+.my-player-label{ font-size: 12.5px; color: var(--cream-dim); }
+.my-player-value{ font-size: 14px; font-weight:600; flex:1; min-width:0; }
+.my-player-cta{ font-size: 11px; text-transform:uppercase; letter-spacing:0.07em; color: var(--gold-bright); }
+
+/* O input de arquivo real fica escondido: quem dispara é o botão do modal, que
+   segue o visual do resto. */
+.file-input-hidden{
+  position:absolute; width:1px; height:1px;
+  opacity:0; pointer-events:none;
+}
+.photo-hint{ text-align:center; margin-bottom: 12px; }
+
+/* ===========================================================================
+   Perfis
+   =========================================================================== */
+.avatar{
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  background: var(--felt-dark);
+  display:inline-flex; align-items:center; justify-content:center;
+  font-family:'Inter', sans-serif; font-weight:700;
+  color: var(--gold-bright);
+  letter-spacing: 0.02em;
+  overflow:hidden;
+}
+.avatar-sm{ width: 34px; height: 34px; font-size: 12px; }
+.avatar-md{ width: 46px; height: 46px; font-size: 15px; }
+.avatar-xl{ width: 88px; height: 88px; font-size: 28px; border-width: 2px; border-color: var(--gold); }
+.avatar-initials{ background: rgba(241,233,216,0.07); }
+
+.profile-card{ display:flex; flex-direction:column; align-items:center; gap: 12px; text-align:center; }
+.profile-head{ display:flex; flex-direction:column; gap: 3px; min-width:0; }
+.profile-name{ font-family:'Fraunces', serif; font-size: 22px; font-weight:600; }
+.profile-alias{ font-size: 13px; color: var(--cream-dim); }
+.profile-email{ font-size: 12px; color: var(--cream-dim); overflow-wrap:anywhere; }
+.profile-photo-row{ display:flex; justify-content:center; margin-bottom: 12px; }
+
+/* Linha de pessoa: avatar + nome + o que ela é. Serve na lista de membros e na
+   do elenco. */
+.roster-people{ display:flex; flex-direction:column; gap: 2px; }
+.person-row{
+  display:flex; align-items:center; gap: 10px;
+  width:100%; text-align:left;
+  padding: 8px 4px;
+  background:none; border:none;
+  border-bottom: 1px solid var(--line);
+  color: var(--cream);
+  font-family:'Inter', sans-serif;
+  cursor:pointer;
+}
+.person-row:last-child{ border-bottom:none; }
+.person-row:disabled{ cursor: default; }
+.person-row.bare{ border-bottom:none; padding: 0; flex:1; min-width:0; }
+.person-text{ display:flex; flex-direction:column; gap: 2px; min-width:0; flex:1; }
+.person-text strong{ font-size: 14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.person-text small{ font-size: 11.5px; color: var(--cream-dim); }
+.person-text small.visitor-tag{ color: var(--gold-bright); opacity: 0.85; }
+
+/* Nome que leva para a página da pessoa, dentro de listas já formatadas — vira
+   botão sem virar bloco, para não desmontar o grid em volta. */
+.name-link{
+  background:none; border:none; padding:0;
+  color: inherit; font: inherit; text-align:left;
+  cursor:pointer;
+  max-width:100%;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  text-decoration: underline;
+  text-decoration-color: var(--gold);
+  text-underline-offset: 3px;
+}
+.name-link:hover{ color: var(--gold-bright); }
+
+/* Copiar a chave pix de quem recebe, direto na linha do acerto. */
+.pix-btn{
+  flex-shrink:0;
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  background: rgba(233,195,74,0.12);
+  background: color-mix(in srgb, var(--gold-bright) 14%, transparent);
+  color: var(--gold-bright);
+  font-family:'Inter', sans-serif;
+  font-size: 10.5px; font-weight:700;
+  text-transform:uppercase; letter-spacing: 0.06em;
+  padding: 3px 9px;
+  cursor:pointer;
+  transition: transform 0.12s ease;
+}
+.pix-btn:active{ transform: scale(0.93); }
+.pix-btn.copied{
+  border-color:#4ADE80;
+  color:#4ADE80;
+  background: rgba(74,222,128,0.15);
+  background: color-mix(in srgb, #4ADE80 15%, transparent);
+}
+
+/* Visitante: joga nas mesas, mas ainda não tem conta que o represente. */
+.visitor-badge{
+  align-self:center;
+  font-size: 11px; text-transform:uppercase; letter-spacing: 0.08em; font-weight:600;
+  color: var(--gold-bright);
+  background: rgba(233,195,74,0.14);
+  background: color-mix(in srgb, var(--gold-bright) 16%, transparent);
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  padding: 3px 12px;
+}
+.person-cta{ color: var(--gold-bright); font-size: 15px; flex-shrink:0; }
+
+/* Aparece só quando o nome digitado já existe no elenco. */
+.nickname-field{ margin-top: 10px; }
+.nickname-field > span{ color: var(--gold-bright); }
+
+.name-fields{ display:flex; gap: 10px; }
+.name-fields .auth-field{ flex:1; min-width:0; }
+
+.pick-list{ max-height: 46vh; overflow-y:auto; }
+.pick-list .theme-option:disabled{ opacity: 0.45; cursor: not-allowed; }
+
+/* Único botão solto do cartão: alinhado à esquerda ele ficava torto no meio de
+   blocos que ocupam a largura toda. */
+.invite-copy{ display:block; margin: 0 auto; }
+
+.invite-code{
+  font-family:'IBM Plex Mono', monospace;
+  font-size: 26px; font-weight:600; letter-spacing: 0.16em;
+  color: var(--gold-bright);
+  text-align:center;
+  background: rgba(0,0,0,0.28);
+  border: 1px dashed var(--gold);
+  border-radius: 12px;
+  padding: 12px 10px;
+  margin-bottom: 10px;
+  user-select: all;
+}
+
+.request-item{
+  display:flex; align-items:center; justify-content:space-between; gap: 10px;
+  padding: 9px 2px;
+  border-bottom: 1px solid var(--line);
+}
+.request-item:last-child{ border-bottom:none; }
+.request-who{ display:flex; flex-direction:column; gap: 2px; min-width:0; }
+.request-who strong{ font-size: 14px; font-weight:600; }
+.request-who small{ font-size: 11.5px; color: var(--cream-dim); overflow-wrap:anywhere; }
+.request-actions{ display:flex; align-items:center; gap: 6px; flex-shrink:0; }
+.request-actions .roster-add-btn{ height: 32px; padding: 0 10px; font-size: 12px; }
+.request-actions .roster-del{ border-left:none; padding: 0 8px; }
+
+.leave-group{ margin-top: 12px; font-size: 13px; }
+
+/* A mesa em andamento e o botão de apagar dela andam juntos. */
+.active-table-wrap{ display:flex; align-items:flex-start; gap: 6px; }
+.active-table-wrap .active-table-card{ flex:1; min-width:0; }
+.active-table-wrap .history-del{ margin-top: 14px; }
+
 .active-table-card{
   display:flex; flex-direction:column; align-items:flex-start; gap: 3px;
   width:100%; text-align:left;
@@ -1120,6 +1434,19 @@ h1 .suit.red{ color: var(--red-bright); }
   border-radius: 10px;
   padding: 8px 12px; margin-bottom: 10px;
   font-size: 12.5px; color: var(--cream);
+  line-height: 1.45;
+}
+/* Sem conexão é um estado que fica; voltar a ficar online é um aviso que passa.
+   A cor não é a única pista — o texto de cada um já diz o que está havendo. */
+.sync-flag.offline{
+  background: rgba(179,58,58,0.18);
+  background: color-mix(in srgb, var(--red-bright) 18%, transparent);
+  border-color: var(--red-bright);
+}
+.sync-flag.online{
+  background: rgba(74,222,128,0.15);
+  background: color-mix(in srgb, #4ADE80 15%, transparent);
+  border-color: #4ADE80;
 }
 
 /* ===========================================================================
@@ -1407,6 +1734,12 @@ h1 .suit.red{ color: var(--red-bright); }
   font-size: 14px;
 }
 .live-row:last-child{ border-bottom:none; }
+/* A tela ao vivo não tem a coluna do botão de remover, então o cabeçalho
+   precisa da mesma grade de três colunas da .live-row — senão "Cacifes" cai
+   embaixo do nome. */
+.col-labels.live-labels{ grid-template-columns: 1fr 60px 92px; }
+.col-labels.live-labels span:nth-child(2){ text-align:center; }
+.col-labels.live-labels span:nth-child(3){ text-align:right; }
 .live-name{ font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .live-cacifes{
   font-family:'IBM Plex Mono', monospace; font-weight:700;

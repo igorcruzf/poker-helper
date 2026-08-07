@@ -8,6 +8,9 @@ export default function Header({
   onOpenStats,
   onOpenThemes,
   onOpenLanguage,
+  onOpenGroups,
+  onOpenProfile,
+  groupName,
   onLogout,
   userEmail,
   canInstall,
@@ -49,6 +52,14 @@ export default function Header({
     {
       label: t('menu.reference'),
       items: [onOpenRanking && { icon: '🂡', label: t('menu.handRanking'), action: onOpenRanking }],
+    },
+    {
+      label: t('menu.group'),
+      caption: groupName,
+      items: [
+        onOpenProfile && { icon: '🙂', label: t('menu.profile'), action: onOpenProfile },
+        onOpenGroups && { icon: '👥', label: t('menu.groups'), action: onOpenGroups },
+      ],
     },
     {
       label: t('menu.data'),

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase.js'
 import { settlementProgress } from '../lib/settlement.js'
 import { computeSaldo, fmt, fmtDate, saldoClass } from '../utils.js'
 import AppChrome from '../components/AppChrome.jsx'
+import PixButton from '../components/PixButton.jsx'
 import { useI18n } from '../hooks/useI18n.js'
 
 // Tela aberta por link, sem login. Todo o acesso passa pelas funções
@@ -66,6 +67,9 @@ export default function SharedSettlementScreen() {
   const canPay = table.allow_guest_payments && table.status === 'finished'
 
   const nameOf = (id) => players.find((p) => p.id === id)?.name || t('settle.removed')
+  // A chave vem junto com a mesa na get_shared_settlement: quem abre o link é
+  // exatamente quem precisa pagar alguém.
+  const pixOf = (id) => players.find((p) => p.id === id)?.pix_key || null
   const progress = settlementProgress(settlements)
   const ordered = [...settlements].sort((a, b) => Number(a.paid) - Number(b.paid))
   const balances = players
@@ -149,6 +153,10 @@ export default function SharedSettlementScreen() {
                         <strong>{nameOf(s.from_table_player_id)}</strong>
                         <span className="settle-arrow">{t('settle.paysTo')}</span>
                         <strong>{nameOf(s.to_table_player_id)}</strong>
+                        <PixButton
+                          pixKey={pixOf(s.to_table_player_id)}
+                          name={nameOf(s.to_table_player_id)}
+                        />
                       </span>
                       <span className="settle-amount">{fmt(s.amount)}</span>
                     </div>

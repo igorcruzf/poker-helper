@@ -4,10 +4,11 @@ import { useBlindsTimer } from '../hooks/useBlindsTimer.js'
 import { useTimeBank } from '../hooks/useTimeBank.js'
 import { useTable } from '../hooks/useTable.js'
 import { useAuth } from '../hooks/useAuth.jsx'
+import { useGroups } from '../hooks/useGroups.jsx'
 import { useModals } from '../hooks/useModals.js'
 import { useSortedPlayers } from '../hooks/useSortedPlayers.js'
 import { useDragReorder } from '../hooks/useDragReorder.js'
-import { onPendingChange } from '../lib/syncQueue.js'
+import { usePixKeys, pixByTablePlayer } from '../hooks/usePixKeys.js'
 import { buildSummaryText, copyText, liveUrlFor, shareUrlFor } from '../lib/summary.js'
 import { useI18n } from '../hooks/useI18n.js'
 
@@ -35,6 +36,8 @@ export default function TableScreen() {
   } = useTable(id)
 
   const { t } = useI18n()
+  const { isHost, activeGroupId } = useGroups()
+  const pixKeys = usePixKeys(activeGroupId)
   const timer = useBlindsTimer(saveTimerState)
   const timeBank = useTimeBank()
   const {
@@ -46,16 +49,19 @@ export default function TableScreen() {
   } = useModals()
   const [addOpen, setAddOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
-  const [pending, setPending] = useState(0)
   const { sort, sortedPlayers, toggleSort, sortArrow, dragEnabled } = useSortedPlayers(players, buyIn, rebuy)
   const { dragId, handleDragStart, handleDragOver, handleDrop, handleDragEnd } = useDragReorder(reorderPlayers)
-
-  useEffect(() => onPendingChange(setPending), [])
 
   // Mesa encerrada não é mais editável: vai direto para o acerto.
   useEffect(() => {
     if (table?.status === 'finished') navigate(`/mesa/${id}/acerto`, { replace: true })
   }, [table?.status, id, navigate])
+
+  // Quem é membro do grupo mas não host acompanha pela tela pública — o RLS
+  // recusaria as escritas daqui de qualquer jeito.
+  useEffect(() => {
+    if (table && !isHost) navigate(`/ao-vivo/${table.share_token}`, { replace: true })
+  }, [table, isHost, navigate])
 
   async function handleAddPlayer({ name, playerId }) {
     await addPlayer({ name, playerId })
@@ -72,6 +78,7 @@ export default function TableScreen() {
         settlementMode: table.settlement_mode,
         rebuy,
         collectorId: previewSettlement(balanceMode).collectorId,
+        pix: pixByTablePlayer(players, pixKeys),
         shareUrl: withLink ? shareUrlFor(table.share_token) : '',
       })
     )
@@ -113,10 +120,6 @@ export default function TableScreen() {
           subtitle={table.name}
           onShare={() => setShareOpen(true)}
         />
-
-        {pending > 0 && (
-          <div className="sync-flag">{t('table.offline', { count: pending })}</div>
-        )}
 
         {timer.active && (
           <button

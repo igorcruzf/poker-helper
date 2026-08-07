@@ -34,11 +34,16 @@ export function AuthProvider({ children }) {
     user: session?.user || null,
     loading,
     signIn: (email, password) => supabase.auth.signInWithPassword({ email, password }),
-    signUp: (email, password) =>
+    // Nome e sobrenome viajam nos metadados da conta: o gatilho
+    // `handle_new_user` no banco lê dali para já criar o perfil junto.
+    signUp: (email, password, { firstName = '', lastName = '' } = {}) =>
       supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: window.location.origin },
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: { first_name: firstName.trim(), last_name: lastName.trim() },
+        },
       }),
     signInWithGoogle: () =>
       supabase.auth.signInWithOAuth({

@@ -10,6 +10,8 @@ export default function LoginScreen() {
   const [mode, setMode] = useState('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -20,7 +22,9 @@ export default function LoginScreen() {
     setError('')
     setNotice('')
     const { data, error } =
-      mode === 'signin' ? await signIn(email.trim(), password) : await signUp(email.trim(), password)
+      mode === 'signin'
+        ? await signIn(email.trim(), password)
+        : await signUp(email.trim(), password, { firstName, lastName })
     if (error) {
       setError(t(authErrorKey(error)))
     } else if (mode === 'signup' && !data?.session) {
@@ -48,6 +52,30 @@ export default function LoginScreen() {
           <p className="auth-lead">{mode === 'signin' ? t('login.leadIn') : t('login.leadUp')}</p>
 
           <form onSubmit={handleSubmit}>
+            {/* No cadastro o perfil já nasce com nome — é o que aparece para os
+                outros no grupo, em vez de só o e-mail. */}
+            {mode === 'signup' && (
+              <div className="name-fields">
+                <label className="auth-field">
+                  <span>{t('profile.firstName')}</span>
+                  <input
+                    autoComplete="given-name"
+                    required
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                  />
+                </label>
+                <label className="auth-field">
+                  <span>{t('profile.lastName')}</span>
+                  <input
+                    autoComplete="family-name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                  />
+                </label>
+              </div>
+            )}
+
             <label className="auth-field">
               <span>{t('login.email')}</span>
               <input

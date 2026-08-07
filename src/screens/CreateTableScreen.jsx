@@ -19,6 +19,7 @@ export default function CreateTableScreen() {
   const [rebuy, setRebuy] = useState('')
   const [selected, setSelected] = useState([]) // ids do elenco
   const [newName, setNewName] = useState('')
+  const [nickname, setNickname] = useState('')
   const [mode, setMode] = useState('top_winner')
   const [collectorId, setCollectorId] = useState('')
   const [shuffleSeats, setShuffleSeats] = useState(true)
@@ -38,16 +39,23 @@ export default function CreateTableScreen() {
     setSelected((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]))
   }
 
+  // O apelido só é pedido quando o nome já existe no elenco — é o que impede
+  // dois Andrés de virarem a mesma pessoa nas estatísticas.
+  const clash = roster.find(
+    (p) => p.name.trim().toLowerCase() === newName.trim().toLowerCase()
+  )
+
   async function handleAddNew(e) {
     e.preventDefault()
     const value = newName.trim()
-    if (!value) return
-    const { data, error } = await addToRoster(value)
+    if (!value || (clash && !nickname.trim())) return
+    const { data, error } = await addToRoster(value, nickname)
     if (error) {
       setError(error.message)
       return
     }
     setNewName('')
+    setNickname('')
     setSelected((prev) => (prev.includes(data.id) ? prev : [...prev, data.id]))
   }
 
@@ -148,11 +156,11 @@ export default function CreateTableScreen() {
                 >
                   <button className="roster-pick" onClick={() => toggle(p.id)}>
                     <span className="roster-check">{selected.includes(p.id) ? '✓' : ''}</span>
-                    <span className="roster-name">{p.name}</span>
+                    <span className="roster-name">{p.label}</span>
                   </button>
                   <button
                     className="roster-del"
-                    title={t('create.deleteRosterTitle', { name: p.name })}
+                    title={t('create.deleteRosterTitle', { name: p.label })}
                     onClick={() => setDeletingRoster(p)}
                   >
                     ✕
@@ -167,8 +175,26 @@ export default function CreateTableScreen() {
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder={t('create.newPlayer')}
               />
-              <button type="submit" className="roster-add-btn">{t('create.add')}</button>
+              <button
+                type="submit"
+                className="roster-add-btn"
+                disabled={!newName.trim() || (!!clash && !nickname.trim())}
+              >
+                {t('create.add')}
+              </button>
             </form>
+
+            {clash && (
+              <label className="auth-field nickname-field">
+                <span>{t('create.nicknameLabel')}</span>
+                <input
+                  value={nickname}
+                  onChange={(e) => setNickname(e.target.value)}
+                  placeholder={t('create.nicknamePlaceholder')}
+                />
+                <small className="field-hint">{t('create.nicknameHint', { name: clash.label })}</small>
+              </label>
+            )}
 
             <div className="section-title">{t('create.whoReceives')}</div>
             <div className="theme-list">
@@ -203,7 +229,7 @@ export default function CreateTableScreen() {
               >
                 <option value="">{t('create.choosePlayer')}</option>
                 {selectedPlayers.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                  <option key={p.id} value={p.id}>{p.label}</option>
                 ))}
               </select>
             )}

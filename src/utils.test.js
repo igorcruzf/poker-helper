@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { fmt, saldoClass, computeSaldo, cacifesCost, parseMoney, fmtDate } from './utils'
+import {
+  fmt, saldoClass, computeSaldo, cacifesCost, parseMoney, fmtDate,
+  pushMoneyDigit, popMoneyDigit, moneyDigitsToNumber, numberToMoneyDigits,
+  playerLabel,
+} from './utils'
 
 describe('fmt', () => {
   it('formats positive values with comma decimal', () => {
@@ -84,6 +88,64 @@ describe('cacifesCost', () => {
 
   it('aceita rebuy mais caro que a entrada', () => {
     expect(cacifesCost(3, 5, 20)).toBe(45)
+  })
+})
+
+describe('playerLabel', () => {
+  it('junta o apelido ao nome para separar dois homônimos', () => {
+    expect(playerLabel({ name: 'André', nickname: 'Careca' })).toBe('André (Careca)')
+    expect(playerLabel({ name: 'André', nickname: 'Baixo' })).toBe('André (Baixo)')
+  })
+
+  it('não inventa parênteses para quem não tem apelido', () => {
+    expect(playerLabel({ name: 'Igor' })).toBe('Igor')
+    expect(playerLabel({ name: 'Igor', nickname: '' })).toBe('Igor')
+    expect(playerLabel({ name: 'Igor', nickname: '   ' })).toBe('Igor')
+  })
+
+  it('aguenta entrada vazia', () => {
+    expect(playerLabel(null)).toBe('')
+    expect(playerLabel({})).toBe('')
+  })
+})
+
+describe('máscara de moeda', () => {
+  it('preenche os centavos da direita para a esquerda', () => {
+    // O que o usuário digita para chegar em 10,20: 1, 0, 2, 0
+    let d = ''
+    d = pushMoneyDigit(d, '1')
+    expect(moneyDigitsToNumber(d)).toBe(0.01)
+    d = pushMoneyDigit(d, '0')
+    expect(moneyDigitsToNumber(d)).toBe(0.1)
+    d = pushMoneyDigit(d, '2')
+    expect(moneyDigitsToNumber(d)).toBe(1.02)
+    d = pushMoneyDigit(d, '0')
+    expect(moneyDigitsToNumber(d)).toBe(10.2)
+  })
+
+  it('começa em zero e apaga dígito a dígito', () => {
+    expect(moneyDigitsToNumber('')).toBe(0)
+    expect(fmt(moneyDigitsToNumber(''))).toBe('R$ 0,00')
+    expect(moneyDigitsToNumber(popMoneyDigit('1020'))).toBe(1.02)
+    expect(popMoneyDigit('')).toBe('')
+  })
+
+  it('ignora zeros à esquerda e o que não for dígito', () => {
+    expect(pushMoneyDigit('', '0')).toBe('0')
+    expect(pushMoneyDigit('0', '5')).toBe('5')
+    expect(pushMoneyDigit('12', ',')).toBe('12')
+    expect(pushMoneyDigit('12', 'a')).toBe('12')
+  })
+
+  it('para de aceitar dígitos no limite em vez de truncar o valor', () => {
+    const max = '123456789'
+    expect(pushMoneyDigit(max, '9')).toBe(max)
+  })
+
+  it('converte um valor existente de volta para dígitos', () => {
+    expect(numberToMoneyDigits(10.2)).toBe('1020')
+    expect(numberToMoneyDigits(0)).toBe('')
+    expect(numberToMoneyDigits(-3.5)).toBe('350')
   })
 })
 

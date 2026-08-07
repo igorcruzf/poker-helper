@@ -12,7 +12,9 @@ export default function DeleteTableModal({ table, onCancel, onConfirm }) {
           {t('tables.deleteTitle', { date: fmtDate(table.finished_at || table.created_at) })}
         </p>
         <p className="modal-hint" style={{ textAlign: 'center' }}>
-          {t('tables.deleteHint')}
+          {/* Apagar uma mesa ainda em andamento joga a noite fora inteira, não
+              só o histórico — o aviso precisa dizer isso. */}
+          {table.status === 'active' ? t('tables.deleteActiveHint') : t('tables.deleteHint')}
         </p>
         <div className="modal-actions">
           <div className="round-action cancel" onClick={onCancel}>✕</div>

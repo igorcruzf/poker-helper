@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTables, tablesToHistory } from '../hooks/useTables.js'
 import { useAuth } from '../hooks/useAuth.jsx'
+import { useGroups } from '../hooks/useGroups.jsx'
+import { useGroupAdmin } from '../hooks/useGroupAdmin.js'
+import { useRoster } from '../hooks/useRoster.js'
 import { computeOverview, computePlayerStats } from '../lib/stats.js'
 import { fmt, fmtDate, saldoClass } from '../utils.js'
 import AppChrome from '../components/AppChrome.jsx'
@@ -39,9 +42,32 @@ function SaldoBar({ saldo, max }) {
 export default function StatsScreen() {
   const navigate = useNavigate()
   const { user, signOut } = useAuth()
+  const { activeGroup, activeGroupId } = useGroups()
   const { finishedTables, loading } = useTables()
+  const { roster } = useRoster()
+  const admin = useGroupAdmin(activeGroupId)
   const { t } = useI18n()
   const [tableView, setTableView] = useState(false)
+
+  // O placar guarda o nome que estava na mesa naquela noite; daqui até a página
+  // da pessoa o caminho é nome → jogador do elenco → conta (se houver). Sem
+  // conta, abre a página do visitante.
+  function personRoute(name) {
+    const player = roster.find(
+      (p) => p.name.trim().toLowerCase() === String(name || '').trim().toLowerCase()
+    )
+    if (!player) return null
+    const member = admin.members.find((m) => m.player_id === player.id)
+    return member ? `/perfil/${member.user_id}` : `/jogador/${player.id}`
+  }
+
+  // Função e não componente: um componente declarado aqui dentro seria um tipo
+  // novo a cada render, e o React remontaria todos os nomes à toa.
+  function personName(name) {
+    const route = personRoute(name)
+    if (!route) return name
+    return <button className="name-link" onClick={() => navigate(route)}>{name}</button>
+  }
 
   const history = tablesToHistory(finishedTables)
   const stats = computePlayerStats(history)
@@ -57,7 +83,7 @@ export default function StatsScreen() {
           onOpenRanking={() => navigate('/ranking')}
           onLogout={signOut}
           userEmail={user?.email}
-          subtitle={t('eyebrow.stats')}
+          subtitle={activeGroup ? `${t('eyebrow.stats')} · ${activeGroup.name}` : t('eyebrow.stats')}
         />
 
         {loading && <div className="empty-state">{t('common.loading')}</div>}
@@ -87,7 +113,7 @@ export default function StatsScreen() {
                   {podium.map((s, i) => (
                     <div className={`podium-slot p${i + 1}`} key={s.name}>
                       <span className="podium-medal">{MEDALS[i]}</span>
-                      <span className="podium-name">{s.name}</span>
+                      <span className="podium-name">{personName(s.name)}</span>
                       <span className={`podium-value ${saldoClass(s.totalSaldo)}`}>
                         {fmt(s.totalSaldo)}
                       </span>
@@ -115,7 +141,7 @@ export default function StatsScreen() {
                         name: s.name, nights: s.nights, cacifes: s.cacifes, avg: fmt(s.avgSaldo),
                       })}
                     >
-                      <span className="saldo-row-name">{s.name}</span>
+                      <span className="saldo-row-name">{personName(s.name)}</span>
                       <SaldoBar saldo={s.totalSaldo} max={maxAbs} />
                       <span className={`saldo-row-value ${saldoClass(s.totalSaldo)}`}>
                         {fmt(s.totalSaldo)}
@@ -138,7 +164,7 @@ export default function StatsScreen() {
                     {stats.map((s) => (
                       <div className="stats-row" key={s.name}>
                         <span className="stats-name">
-                          {s.name}
+                          {personName(s.name)}
                           <small>
                             {t('stats.rowDetail', {
                               avg: fmt(s.avgSaldo), cacifes: s.cacifes, rate: s.winRate,

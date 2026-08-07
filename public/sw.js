@@ -1,5 +1,8 @@
-const CACHE = 'poker-cacifes-v4'
-const CORE = ['.', 'index.html', 'manifest.webmanifest', 'icon.svg']
+const CACHE = 'poker-cacifes-v6'
+const CORE = [
+  '.', 'index.html', 'manifest.webmanifest', 'default_image.png',
+  'icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png',
+]
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

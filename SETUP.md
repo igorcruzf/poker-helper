@@ -13,16 +13,29 @@ Passo a passo do zero. Leva uns 15 minutos.
 ## 2. Criar as tabelas
 
 **SQL Editor → New query**, cole o conteúdo de [`supabase/schema.sql`](supabase/schema.sql)
-e clique em **Run**. Ele cria 4 tabelas, os índices e as regras de acesso (RLS).
+e clique em **Run**. Ele cria as tabelas, os índices e as regras de acesso (RLS).
+
+O script é idempotente: pode rodar de novo a cada atualização do app, e é o que
+você faz para aplicar uma versão nova do esquema sem perder dado.
 
 ### O que cada tabela guarda
 
 | Tabela | Para que serve |
 | --- | --- |
-| `players` | Seu **elenco**: os jogadores que sempre aparecem. É essa lista que você marca ao criar uma mesa. |
+| `groups` | O **grupo**: a turma que joga junto. É dele que penduram elenco, mesas e estatísticas — não da conta de uma pessoa. Tem um `invite_code` curto para chamar gente e a foto do grupo, guardada na própria coluna `image_url` como data URI (o navegador reduz para ~150 KB antes de enviar; o banco recusa acima de 300 000 caracteres). Sem Storage, sem bucket, sem link externo. |
+| `group_members` | Quem participa do grupo, com que **papel** (`owner` criou, `host` conduz as mesas, `member` acompanha) e qual jogador do elenco essa pessoa representa — é assim que o app sabe qual daqueles nomes é você. |
+| `group_join_requests` | Os **pedidos de entrada** feitos com o código de convite, esperando um host aprovar. |
+| `profiles` | O **perfil** de cada conta: nome, sobrenome, foto (mesmo esquema da foto do grupo) e a **chave pix** (opcional). Nasce por gatilho junto com a conta, inclusive no login com Google. Só quem divide um grupo com você enxerga o seu — a exceção é a chave pix, que sai também para quem abre o link do acerto, porque é justamente quem precisa te pagar. |
+| `players` | O **elenco do grupo**: os jogadores que sempre aparecem. É essa lista que você marca ao criar uma mesa. |
 | `poker_tables` | Uma **noite de poker**: valor do cacife, status (`active`/`finished`) e quem centraliza o acerto. |
 | `table_players` | Quem **sentou** naquela mesa, com `cacifes` e `adjustment`. O nome é copiado no momento do jogo, então apagar alguém do elenco não estraga o histórico. |
 | `settlements` | O **acerto**: uma linha por pagamento (`quem paga` → `quem recebe`, `amount`, `paid`). É o que a tela de acerto marca como pago. |
+
+### Vindo de uma versão sem grupos
+
+O próprio script migra: cada conta que já tinha elenco ou mesa ganha um grupo
+"Meu grupo", entra nele como dona e leva junto tudo que era dela. Ninguém
+precisa recadastrar nada.
 
 Mais duas funções, usadas pelo link público do acerto (seção 6 do script):
 `get_shared_settlement(token)` e `set_shared_payment(token, pagamento, pago)`.
@@ -60,10 +73,16 @@ O link antigo morre na hora.
 
 ### Segurança (já vem no script)
 
-RLS ligado nas 4 tabelas. `players` e `poker_tables` filtram por
-`owner_id = auth.uid()`; `table_players` e `settlements` herdam o dono pela mesa.
-Ou seja: mesmo com a anon key exposta no front (o que é normal e esperado),
-ninguém enxerga as mesas de outra conta.
+RLS ligado em todas as tabelas, e o filtro é o **grupo**: `players` e
+`poker_tables` só aparecem para quem é membro (`is_group_member`), e só host
+escreve (`is_group_host`); `table_players` e `settlements` herdam isso pela
+mesa. Ou seja: mesmo com a anon key exposta no front (o que é normal e
+esperado), ninguém enxerga as mesas de um grupo de que não faz parte.
+
+Entrar num grupo, aprovar pedido e mudar permissão passam por funções
+`security definer` (`request_group_join`, `approve_join_request`,
+`set_member_role`) — é o único jeito de quem ainda não é membro conseguir
+sequer ver o nome do grupo, e cada uma confere o papel de quem chamou.
 
 ## 3. Ligar o login
 
@@ -154,5 +173,7 @@ apagar quando quiser.
 | Tela "Falta configurar o Supabase" | `.env` ausente ou sem o prefixo `VITE_`; na Vercel, faltou redeploy. |
 | Login com Google volta para uma página em branco | URL faltando em _Redirect URLs_. |
 | Entra mas a lista de mesas fica vazia e nada salva | O `schema.sql` não rodou, ou rodou sem as políticas de RLS. |
-| `new row violates row-level security policy` | Está autenticado mas o `owner_id` não bate — confira se rodou o script inteiro. |
+| `new row violates row-level security policy` | Está autenticado mas você não é host desse grupo — confira se rodou o script inteiro. |
+| `could not create unique index "players_owner_name_idx"` | Versão antiga do `schema.sql`: depois dos grupos o mesmo nome pode existir em grupos diferentes, e o índice antigo (por conta) não aceita. Pegue o `schema.sql` atual e rode de novo — ele apaga esse índice em vez de recriar. |
+| Só parte do script aplicou | Não existe: o SQL Editor roda tudo numa transação, então um erro desfaz o run inteiro. Corrija a causa e rode de novo. |
 | `/mesa/<id>` dá 404 na Vercel | `vercel.json` não subiu no deploy. |

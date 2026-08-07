@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTables } from '../hooks/useTables.js'
 import { useAuth } from '../hooks/useAuth.jsx'
+import { useGroups } from '../hooks/useGroups.jsx'
 import { settlementProgress } from '../lib/settlement.js'
 import { fmt, fmtDate } from '../utils.js'
 import AppChrome from '../components/AppChrome.jsx'
@@ -11,14 +12,30 @@ import { useI18n } from '../hooks/useI18n.js'
 export default function TablesScreen() {
   const navigate = useNavigate()
   const { user, signOut } = useAuth()
-  const { activeTable, finishedTables, loading, error, deleteTable } = useTables()
+  const { activeGroup, isHost, groups } = useGroups()
+  const { activeTables, finishedTables, loading, error, deleteTable } = useTables()
   const { t } = useI18n()
   const [deleting, setDeleting] = useState(null)
   const [onlyPending, setOnlyPending] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const isPending = (table) => settlementProgress(table.settlements || []).pending > 0
   const pendingCount = finishedTables.filter(isPending).length
   const visibleTables = onlyPending ? finishedTables.filter(isPending) : finishedTables
+
+  // Quem não conduz o grupo acompanha pela mesma tela pública do link: dá para
+  // ver tudo e marcar o próprio pagamento, sem poder mexer nos cacifes.
+  const openTable = (table) =>
+    isHost ? navigate(`/mesa/${table.id}`) : navigate(`/ao-vivo/${table.share_token}`)
+  const openSettlement = (table) =>
+    isHost ? navigate(`/mesa/${table.id}/acerto`) : navigate(`/acerto/${table.share_token}`)
+
+  async function confirmDelete() {
+    const table = deleting
+    setDeleting(null)
+    const { error } = await deleteTable(table.id)
+    setDeleteError(error ? t('tables.deleteFailed') : '')
+  }
 
   return (
     <div className="app-shell">
@@ -28,31 +45,54 @@ export default function TablesScreen() {
           onOpenStats={() => navigate('/estatisticas')}
           onLogout={signOut}
           userEmail={user?.email}
+          subtitle={activeGroup?.name}
         />
 
         {error && <div className="auth-error">{error}</div>}
+        {deleteError && <div className="auth-error">{deleteError}</div>}
 
-        {activeTable && (
-          <button className="active-table-card" onClick={() => navigate(`/mesa/${activeTable.id}`)}>
-            <span className="active-table-flag">{t('tables.activeFlag')}</span>
-            <span className="active-table-name">
-              {activeTable.name || t('tables.defaultName', { date: fmtDate(activeTable.created_at) })}
-            </span>
-            <span className="active-table-meta">
-              {t('tables.playersAndBuyIn', {
-                count: activeTable.table_players?.length || 0,
-                buyIn: fmt(activeTable.buy_in),
-              })}
-            </span>
-            <span className="active-table-cta">{t('tables.continue')}</span>
+        {groups.length > 1 && (
+          <button className="group-switch" onClick={() => navigate('/grupos')}>
+            {t('tables.groupSwitch', { group: activeGroup?.name || '' })}
           </button>
         )}
 
-        <div className="footer-actions">
-          <button className="add-player-btn" onClick={() => navigate('/nova')}>
-            {activeTable ? t('tables.createAnother') : t('tables.create')}
-          </button>
-        </div>
+        {/* Mais de uma mesa pode ficar aberta ao mesmo tempo — todas aparecem,
+            senão as antigas viravam fantasmas impossíveis de achar ou apagar. */}
+        {activeTables.map((table) => (
+          <div className="active-table-wrap" key={table.id}>
+            <button className="active-table-card" onClick={() => openTable(table)}>
+              <span className="active-table-flag">{t('tables.activeFlag')}</span>
+              <span className="active-table-name">
+                {table.name || t('tables.defaultName', { date: fmtDate(table.created_at) })}
+              </span>
+              <span className="active-table-meta">
+                {t('tables.playersAndBuyIn', {
+                  count: table.table_players?.length || 0,
+                  buyIn: fmt(table.buy_in),
+                })}
+              </span>
+              <span className="active-table-cta">
+                {isHost ? t('tables.continue') : t('tables.follow')}
+              </span>
+            </button>
+            {isHost && (
+              <button
+                className="history-del"
+                title={t('tables.deleteTable')}
+                onClick={() => setDeleting(table)}
+              >✕</button>
+            )}
+          </div>
+        ))}
+
+        {isHost && (
+          <div className="footer-actions">
+            <button className="add-player-btn" onClick={() => navigate('/nova')}>
+              {activeTables.length > 0 ? t('tables.createAnother') : t('tables.create')}
+            </button>
+          </div>
+        )}
 
         <div className="rail">
           <div className="card">
@@ -99,14 +139,16 @@ export default function TablesScreen() {
                       <span className="history-buyin">
                         {table.name ? `${table.name} · ` : ''}{fmt(table.buy_in)}
                       </span>
-                      <button
-                        className="history-del"
-                        title={t('tables.deleteTable')}
-                        onClick={() => setDeleting(table)}
-                      >✕</button>
+                      {isHost && (
+                        <button
+                          className="history-del"
+                          title={t('tables.deleteTable')}
+                          onClick={() => setDeleting(table)}
+                        >✕</button>
+                      )}
                     </div>
 
-                    <button className="history-open" onClick={() => navigate(`/mesa/${table.id}/acerto`)}>
+                    <button className="history-open" onClick={() => openSettlement(table)}>
                       <span className={`pay-pill${settled ? ' done' : ''}`}>
                         {progress.total === 0
                           ? t('tables.noSettlement')
@@ -130,7 +172,7 @@ export default function TablesScreen() {
       <DeleteTableModal
         table={deleting}
         onCancel={() => setDeleting(null)}
-        onConfirm={() => { deleteTable(deleting.id); setDeleting(null) }}
+        onConfirm={confirmDelete}
       />
     </div>
   )

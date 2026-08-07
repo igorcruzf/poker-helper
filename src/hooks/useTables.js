@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
-import { computeSaldo, shuffle } from '../utils.js'
+import { dropQueued, reportResult } from '../lib/syncQueue.js'
+import { computeSaldo, playerLabel, shuffle } from '../utils.js'
 import { useAuth } from './useAuth.jsx'
+import { useGroups } from './useGroups.jsx'
 
 const TABLE_SELECT = `
   id, name, buy_in, rebuy_value, status, settlement_mode, settlement_player_id,
@@ -10,27 +12,34 @@ const TABLE_SELECT = `
   settlements ( id, from_table_player_id, to_table_player_id, amount, paid, paid_at )
 `
 
-// Todas as mesas do usuário — a ativa e o histórico das encerradas.
+// Todas as mesas do grupo — as em andamento e o histórico das encerradas.
 export function useTables() {
   const { user } = useAuth()
+  const { activeGroupId } = useGroups()
   const [tables, setTables] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   const load = useCallback(async () => {
-    if (!supabase || !user) return
+    if (!supabase || !user || !activeGroupId) {
+      setTables([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
     const { data, error } = await supabase
       .from('poker_tables')
       .select(TABLE_SELECT)
+      .eq('group_id', activeGroupId)
       .order('created_at', { ascending: false })
+    reportResult(error)
     if (error) setError(error.message)
     else {
       setTables(data || [])
       setError(null)
     }
     setLoading(false)
-  }, [user])
+  }, [user, activeGroupId])
 
   useEffect(() => {
     load()
@@ -47,11 +56,13 @@ export function useTables() {
     allowGuestPayments = true,
   }) {
     if (!user) return { data: null, error: new Error('Sem sessão') }
+    if (!activeGroupId) return { data: null, error: new Error('Sem grupo ativo') }
 
     const { data: table, error } = await supabase
       .from('poker_tables')
       .insert({
         owner_id: user.id,
+        group_id: activeGroupId,
         name: name?.trim() || null,
         buy_in: buyIn,
         rebuy_value: rebuy === null || rebuy === undefined ? null : rebuy,
@@ -61,6 +72,7 @@ export function useTables() {
       })
       .select('id, share_token')
       .single()
+    reportResult(error)
     if (error) return { data: null, error }
 
     // A ordem em que entram é a ordem dos lugares; o primeiro abre como dealer.
@@ -68,7 +80,8 @@ export function useTables() {
     const rows = seated.map((p, i) => ({
       table_id: table.id,
       player_id: p.id || null,
-      name: p.name,
+      // Grava o rótulo com apelido: é o que separa os dois Andrés no histórico.
+      name: p.label || playerLabel(p),
       cacifes: 1,
       adjustment: 0,
       position: i,
@@ -81,20 +94,63 @@ export function useTables() {
         return { data: null, error: playersError }
       }
     }
+    await load()
     return { data: table, error: null }
   }
 
+  // A exclusão precisa ser confirmada pelo banco. Antes ela só sumia da tela: se
+  // o delete não passasse (RLS, rede), a mesa voltava sozinha no próximo
+  // carregamento e ninguém entendia o porquê.
   async function deleteTable(id) {
+    const before = tables
     setTables((prev) => prev.filter((t) => t.id !== id))
-    const { error } = await supabase.from('poker_tables').delete().eq('id', id)
-    if (error) load()
-    return { error }
+
+    const table = before.find((t) => t.id === id)
+    const { data, error } = await supabase
+      .from('poker_tables')
+      .delete()
+      .eq('id', id)
+      .select('id')
+    reportResult(error)
+
+    if (error) {
+      setTables(before)
+      setError(error.message)
+      return { error }
+    }
+    if (!data || data.length === 0) {
+      // Sem erro e sem linha apagada = o RLS barrou em silêncio.
+      setTables(before)
+      const denied = new Error('delete_denied')
+      setError(denied.message)
+      return { error: denied }
+    }
+
+    // Nada de patch represado apontando para linhas que não existem mais.
+    dropQueued('poker_tables', id)
+    dropQueued('table_players', (table?.table_players || []).map((p) => p.id))
+    dropQueued('settlements', (table?.settlements || []).map((s) => s.id))
+    setError(null)
+    return { error: null }
   }
 
-  const activeTable = tables.find((t) => t.status === 'active') || null
+  // Mais de uma mesa pode estar aberta ao mesmo tempo (duas rodadas na mesma
+  // noite, uma que ficou esquecida sem encerrar). Antes só a mais recente
+  // aparecia e as outras ficavam invisíveis — inalcançáveis até para apagar.
+  const activeTables = tables.filter((t) => t.status === 'active')
   const finishedTables = tables.filter((t) => t.status === 'finished')
 
-  return { tables, activeTable, finishedTables, loading, error, createTable, deleteTable, reload: load }
+  return {
+    tables,
+    activeTables,
+    activeTable: activeTables[0] || null,
+    finishedTables,
+    loading,
+    error,
+    createTable,
+    deleteTable,
+    reload: load,
+  }
 }
 
 // Converte mesas encerradas para o formato que o StatsModal já entende.

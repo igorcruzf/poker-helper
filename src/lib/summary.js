@@ -23,9 +23,14 @@ export function buildSummaryText(players, buyIn, options = {}) {
     })
     if (transfers.length > 0) {
       const nameOf = (id) => balances.find((b) => b.id === id)?.name || '—'
+      // A chave de quem recebe vai colada no pagamento: é o que a pessoa
+      // precisa ter em mãos ao ler a mensagem no grupo.
+      const pix = options.pix || {}
       lines.push('', 'Acerto:')
       transfers.forEach((t) => {
-        lines.push(`${nameOf(t.fromId)} paga ${fmt(t.amount)} para ${nameOf(t.toId)}`)
+        const key = pix[t.toId]
+        const suffix = key ? ` (pix: ${key})` : ''
+        lines.push(`${nameOf(t.fromId)} paga ${fmt(t.amount)} para ${nameOf(t.toId)}${suffix}`)
       })
     } else {
       lines.push('', 'Ninguém deve nada a ninguém.')
@@ -47,6 +52,12 @@ export function shareUrlFor(shareToken) {
 export function liveUrlFor(shareToken) {
   if (!shareToken) return ''
   return `${window.location.origin}/ao-vivo/${shareToken}`
+}
+
+// Convite do grupo: quem abrir cai na tela de entrar já com o código no campo.
+export function groupInviteUrlFor(code) {
+  if (!code) return ''
+  return `${window.location.origin}/entrar/${code}`
 }
 
 // Copia sem quebrar em navegador que bloqueia a Clipboard API.

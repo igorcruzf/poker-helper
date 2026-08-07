@@ -138,7 +138,7 @@ export default function SharedTableScreen() {
           <div className="card">
             <BuyInRow buyIn={buyIn} rebuy={rebuy} />
 
-            <div className="col-labels">
+            <div className="col-labels live-labels">
               <span>{t('table.name')}</span>
               <span>{t('table.cacifes')}</span>
               <span>{t('table.saldo')}</span>

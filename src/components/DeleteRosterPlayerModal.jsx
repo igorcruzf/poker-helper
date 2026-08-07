@@ -7,7 +7,7 @@ export default function DeleteRosterPlayerModal({ player, onCancel, onConfirm })
   return (
     <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}>
       <div className="modal">
-        <p className="question">{t('create.deleteRoster', { name: player.name })}</p>
+        <p className="question">{t('create.deleteRoster', { name: player.label || player.name })}</p>
         <p className="modal-hint" style={{ textAlign: 'center' }}>
           {t('create.deleteRosterHint')}
         </p>

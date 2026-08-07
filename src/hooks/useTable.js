@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
-import { saveRow } from '../lib/syncQueue.js'
+import { reportResult, saveRow } from '../lib/syncQueue.js'
 import {
   EPS,
   balancePlayers,
@@ -65,6 +65,7 @@ export function useTable(tableId) {
       .select(TABLE_SELECT)
       .eq('id', tableId)
       .single()
+    reportResult(error)
     if (error) {
       setError(error.message)
       setLoading(false)
